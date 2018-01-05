@@ -41,7 +41,7 @@ func getCall(collection *mgo.Collection) {
 	}
 	fmt.Println("p2p min10time:", min10time)
 	fmt.Println("p2p通话总数(5m):", len(p2pinfos))
-	fmt.Println("p2p通话内容(p2pinfos):", p2pinfos)
+	//fmt.Println("p2p通话内容(p2pinfos):", p2pinfos)
 	for _, v := range p2pinfos {
 		if v.Called > 99999999 || v.Caller > 99999999 {
 			fmt.Println("出现不合理用户视讯号", v.Called, v.Caller)
@@ -92,6 +92,10 @@ func getCall(collection *mgo.Collection) {
 					}
 				}
 			}
+			if v.EventType != 0 && v.EventType != -10000 && v.EventType != 6030 && v.EventType != 6031 && v.EventType != 6032 && v.EventType != 4848 && v.EventType != 4849 && v.EventType != 4855 && v.EventType != 4860 && v.EventType != 4865 {
+				entToNumber3[numberToEnt[numberArray[v.Called]]]++
+				entToNumber3[numberToEnt[numberArray[v.Caller]]]++
+			}
 
 		}
 		if v.InsertTime-v.Endtime >= 5*60*1000 {
@@ -112,10 +116,7 @@ func getCall(collection *mgo.Collection) {
 		}
 		entToNumber1[numberToEnt[numberArray[v.Called]]]++
 		entToNumber1[numberToEnt[numberArray[v.Caller]]]++
-		if v.EventType != 0 && v.EventType != -10000 {
-			entToNumber3[numberToEnt[numberArray[v.Called]]]++
-			entToNumber3[numberToEnt[numberArray[v.Caller]]]++
-		}
+
 	}
 }
 
@@ -193,7 +194,7 @@ func ispCityCall(collection *mgo.Collection) {
 	//	}
 
 	fmt.Println("p2p的ip统计总数(5m)", len(p2pispcitys))
-	fmt.Println("p2p的ip统计内容(p2pispcitys)", p2pispcitys)
+	//fmt.Println("p2p的ip统计内容(p2pispcitys)", p2pispcitys)
 	for _, v := range p2pispcitys {
 		domToNumber[v.Value.Ldom]++
 		domToNumber[v.Value.Rdom]++

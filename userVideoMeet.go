@@ -10,15 +10,26 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func uservideo(conn *mgo.Collection, mintime int32) {
+func uservideoup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime int32) {
 
 	mapfunc := `function() { 
         uid = parseInt(this.userId)
-        if(this.userId === this.speakerId && 
+        if(this.userId == this.speakerId && 
               uid > 9999999 &&
 			((this.resourceId==101 && this.deviceType==5)||(this.resourceId==101 && this.deviceType==6)||(this.resourceId==100))
 			){
-            emit(this.userId, 
+			var org,fin
+			if(this.lossRateOriginal==0){
+				org=0
+			}else{
+				org=this.lossRateOriginal/100
+			}
+			if(this.lossRateFinal==0){
+				fin=0
+			}else{
+				fin=this.lossRateFinal/100
+			}
+            emit({userid:this.userId, speakerid:this.speakerId} , 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -26,8 +37,266 @@ func uservideo(conn *mgo.Collection, mintime int32) {
                       networkType: this.networkType, 
                       codeRate: this.curCodeRate, 
                       frameRate: this.frameRate, 
-                      lossRateOrg: this.lossRateOriginal,
-                      lossRateFin: this.lossRateFinal, 
+                      lossRateOrg: org,
+                      lossRateFin: fin, 
+                      delay: this.delayTimeIntArray,
+                      odbw: this.origDetectedBW,
+                      deviceType: this.deviceType,
+                      networkType: this.networkType}
+                      );
+        }
+    }`
+
+	reducefunc := `  function(userId, info) {
+        reducedVal = {
+            userIp: info[0].userIp, 
+            relayIp: info[0].relayIp, 
+            meetingId: info[0].meetingId,
+            deviceType: info[0].deviceType, 
+            networkType: info[0].networkType,  
+            crArr: new Array(), 
+            frArr: new Array(), 
+            lossOrgArr: new Array(),
+            loss: 0, 
+            delayArr: new Array(), 
+            delayLoss: 0,
+            odbw: 0,
+            dropline: false,
+            deviceType: info[0].deviceType,
+            networkType: info[0].networkType,
+            };
+        for (var idx = 0; idx < info.length; idx++) {
+            if (info[idx].codeRate === undefined){
+                Array.prototype.push.apply(reducedVal.crArr, info[idx].crArr);
+                Array.prototype.push.apply(reducedVal.frArr, info[idx].frArr);
+                Array.prototype.push.apply(reducedVal.lossOrgArr, info[idx].lossOrgArr);
+                reducedVal.loss += info[idx].loss;
+                reducedVal.delayLoss += info[idx].delayLoss;
+                Array.prototype.push.apply(reducedVal.delayArr, info[idx].delayArr);
+                reducedVal.odbw = info[idx].odbw;
+                reducedVal.offline = info[idx].offline;
+            }else{
+                reducedVal.crArr.push(info[idx].codeRate);
+                reducedVal.frArr.push(info[idx].frameRate);
+                if (info[idx].lossRateFin > 0) {
+                    reducedVal.loss += 1;
+                }
+                if (info[idx].lossRateOrg > 0) {
+                    reducedVal.lossOrgArr.push(info[idx].lossRateOrg);
+                }
+                var ds = info[idx].delay.split('|');
+                ds.forEach(function(d) {
+                    if (d === "-1" || d === "") {
+                        reducedVal.delayLoss += 1;
+                    } else {
+                        reducedVal.delayArr.push(parseInt(d));
+                    }
+                });
+                if (info[idx].odbw !== -1 &&
+                    reducedVal.odbw === 0){
+                    reducedVal.odbw = info[idx].odbw
+                }
+                if (reducedVal.odbw !== 0 &&
+                    info[idx].odbw === -1){
+                    if (reducedVal.meetingId === info[idx].meetingId){
+                        reducedVal.dropline = true;
+                    }else{
+                        reducedVal.meetingId = info[idx].meetingId
+                        reducedVal.odbw = 0;
+                    }
+                }
+            }
+        }
+        return reducedVal
+    }`
+	finalizefunc := `function(key, val){
+           
+		 if(val.loss == undefined){
+			return {
+                userip: "**",
+                relayip: "",
+                meetingid: "",
+                crarr: "",
+                frarr: "",
+                lossorgarr: "",
+                loss: 0, 
+                delayarr: "",
+                delayloss: 0,
+                dropline: false,
+                devicetype: 0,
+                networktype: 0,
+
+                }
+		 }
+            return {
+                userip: val.userIp,
+                relayip: val.relayIp,
+                meetingid: val.meetingId,
+                crarr: Array.join(val.crArr),
+                frarr: Array.join(val.frArr),
+                lossorgarr: Array.join(val.lossOrgArr),
+                loss: val.loss, 
+                delayarr: Array.join(val.delayArr),
+                delayloss: val.delayLoss,
+                dropline: val.dropline,
+                devicetype: val.deviceType,
+                networktype: val.networkType,
+
+                }
+        }`
+
+	mapreduceup := &mgo.MapReduce{
+		Map:      mapfunc,
+		Reduce:   reducefunc,
+		Finalize: finalizefunc,
+	}
+
+	var uservideosup []uservideoinfo
+
+	_, err := conn.Find(bson.M{"timeStamp": bson.M{"$gte": mintime}}).MapReduce(mapreduceup, &uservideosup)
+	if err != nil {
+		fmt.Println(err, "372")
+		if len(uservideosup) == 0 {
+			return
+		}
+	}
+
+	relaymap := globeCfg.Output.Relaymap
+
+	//视频上行
+	for _, v := range uservideosup {
+
+		if v.Id.Userid == "" {
+			continue
+		}
+		if v.Value.Userip == "**" {
+			continue
+		}
+		usernumber, err := strconv.ParseInt(v.Id.Userid, 10, 64)
+		if err != nil {
+			continue
+		}
+		var userent string
+		var meetent string
+		userent = usermap[usernumber]
+		meetent = userent
+		if usermap[usernumber] == "非商业" || usermap[usernumber] == "" {
+			userent = "非商业用户"
+			isBusiness, usetid := isBusinessmeet(collectionmeet, int(v.Value.Meetingid))
+			if !isBusiness {
+				continue
+			} else {
+				meetent = usermap[usetid]
+			}
+
+		}
+		var relayDomIsp string
+		var userDom string
+		var userIsp string
+
+		var meetid string
+		meetid = strconv.Itoa(int(v.Value.Meetingid))
+		relayid := strings.Split(v.Value.Relayip, ":")
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknow"
+		}
+		userid := strings.Split(v.Value.Userip, ":")
+		loc, err := ip17mon.Find(userid[0])
+		if err != nil {
+			fmt.Println(err, "162")
+			return
+		}
+		if loc.City == "N/A" {
+			if loc.Region == "N/A" {
+				if loc.Country == "N/A" {
+					userDom = "unknown"
+				} else {
+					userDom = loc.Country
+				}
+			} else {
+				userDom = loc.Region
+			}
+		} else {
+			userDom = loc.City
+		}
+		userIsp = loc.Isp
+
+		userkeys := userkey{
+			Userid:    v.Id.Userid,
+			Meetintid: meetid,
+			Speakerid: v.Id.Speakerid,
+		}
+
+		if uservideoqualityup[userkeys].Id.Userid == "" {
+
+			user := uservideoinfo{}
+			user.Id = v.Id
+			user.Value.Meetingid = v.Value.Meetingid
+			user.Value.Userent = userent
+			user.Value.Meetent = meetent
+			user.Value.Devicetype = v.Value.Devicetype
+			user.Value.Networktype = v.Value.Networktype
+			user.Value.Userdom = userDom
+			user.Value.Userisp = userIsp
+			user.Value.Relaydomisp = relayDomIsp
+			user.Value.Crarr = v.Value.Crarr
+			user.Value.Frarr = v.Value.Frarr
+			user.Value.Delayarr = v.Value.Delayarr
+			user.Value.Delayloss = v.Value.Delayloss
+			user.Value.Loss = v.Value.Loss
+			user.Value.Lossorgarr = v.Value.Lossorgarr
+			user.Value.Dropline = v.Value.Dropline
+			v.Value.Users = 1
+			uservideoqualityup[userkeys] = user
+		} else {
+			user := uservideoqualityup[userkeys]
+			user.Value.Crarr += "," + v.Value.Crarr
+			user.Value.Frarr += "," + v.Value.Frarr
+			user.Value.Delayarr += "," + v.Value.Delayarr
+			user.Value.Delayloss += v.Value.Delayloss
+			user.Value.Loss += v.Value.Loss
+			user.Value.Lossorgarr += "," + v.Value.Lossorgarr
+			if v.Value.Dropline == true {
+				user.Value.Dropline = true
+			}
+			v.Value.Users += 1
+			uservideoqualityup[userkeys] = user
+		}
+
+	}
+
+}
+func uservideodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime int32) {
+
+	mapfunc2 := `function() { 
+        uid = parseInt(this.userId)
+        if(this.userId != this.speakerId && 
+              uid > 9999999 &&
+			((this.resourceId==101 && this.deviceType==5)||(this.resourceId==101 && this.deviceType==6)||(this.resourceId==100))
+			){
+				var org,fin
+			if(this.lossRateOriginal==0){
+				org=0
+			}else{
+				org=this.lossRateOriginal/100
+			}
+			if(this.lossRateFinal==0){
+				fin=0
+			}else{
+				fin=this.lossRateFinal/100
+			}
+            emit({userid:this.userId, speakerid:this.speakerId} , 
+                  {userIp: this.userIp, 
+                      relayIp: this.relayIp, 
+                      meetingId: this.meetingId,
+                      deviceType: this.deviceType,
+                      networkType: this.networkType, 
+                      codeRate: this.curCodeRate, 
+                      frameRate: this.frameRate, 
+                      lossRateOrg: org,
+                      lossRateFin: fin, 
                       delay: this.delayTimeIntArray,
                       odbw: this.origDetectedBW,
                       deviceType: this.deviceType,
@@ -98,68 +367,100 @@ func uservideo(conn *mgo.Collection, mintime int32) {
         return reducedVal
     }`
 	finalizefunc := `function(key, val){
-            lo = 0;
-            loa = 0;
-            los = 0;
-            if (val.lossOrgArr.length > 0) {
-                lo = val.lossOrgArr.length;
-                loa = Array.avg(val.lossOrgArr);
-                los = Array.stdDev(val.lossOrgArr);
-            }
+           
+		 if(val.loss == undefined){
+			return {
+                userip: "**",
+                relayip: "",
+                meetingid: "",
+                crarr: "",
+                frarr: "",
+                lossorgarr: "",
+                loss: 0, 
+                delayarr: "",
+                delayloss: 0,
+                dropline: false,
+                devicetype: 0,
+                networktype: 0,
+
+                }
+		 }
             return {
-                userIp: val.userIp, 
-                relayIp: val.relayIp, 
-                meetingId: val.meetingId,
-                deviceType: val.deviceType,
-                networkType: val.networkType,  
-                crAvg: Array.avg(val.crArr), 
-                crStd: Array.stdDev(val.crArr), 
-                frAvg: Array.avg(val.frArr), 
-                frStd: Array.stdDev(val.frArr), 
-                lossOrg: lo,
-                lossOrgAvg: loa,
-                lossOrgStd: los,
+                userip: val.userIp,
+                relayip: val.relayIp,
+                meetingid: val.meetingId,
+                crarr: Array.join(val.crArr),
+                frarr: Array.join(val.frArr),
+                lossorgarr: Array.join(val.lossOrgArr),
                 loss: val.loss, 
-                delayAvg: Array.avg(val.delayArr), 
-                delayStd: Array.stdDev(val.delayArr), 
-                delayLoss: val.delayLoss,
+                delayarr: Array.join(val.delayArr),
+                delayloss: val.delayLoss,
                 dropline: val.dropline,
-                deviceType: val.deviceType,
-                networkType: val.networkType,
+                devicetype: val.deviceType,
+                networktype: val.networkType,
+
                 }
         }`
-	mapreduce := &mgo.MapReduce{
-		Map:      mapfunc,
+
+	mapreducedown := &mgo.MapReduce{
+		Map:      mapfunc2,
 		Reduce:   reducefunc,
 		Finalize: finalizefunc,
 	}
-	var uservideos []uservideoinfo
-	_, err := conn.Find(bson.M{"timeStamp": bson.M{"$gte": mintime}}).MapReduce(mapreduce, &uservideos)
+
+	var uservideosdown []uservideoinfo
+
+	_, err := conn.Find(bson.M{"timeStamp": bson.M{"$gte": mintime}}).MapReduce(mapreducedown, &uservideosdown)
 	if err != nil {
-		fmt.Println(err, "137")
-		return
+		fmt.Println(err, "379")
+		if len(uservideosdown) == 0 {
+			return
+		}
 	}
 	relaymap := globeCfg.Output.Relaymap
 
-	for _, v := range uservideos {
-		usernumber, err := strconv.ParseInt(v.Id, 10, 64)
+	//视频下行
+	for _, v := range uservideosdown {
+		if v.Id.Userid == "" {
+			continue
+		}
+		if v.Value.Userip == "**" {
+			continue
+		}
+		usernumber, err := strconv.ParseInt(v.Id.Userid, 10, 64)
 		if err != nil {
 			continue
 		}
+		var userent string
+		var meetent string
+		userent = usermap[usernumber]
+		meetent = userent
 		if usermap[usernumber] == "非商业" || usermap[usernumber] == "" {
-			continue
+			userent = "非商业用户"
+			isBusiness, usetid := isBusinessmeet(collectionmeet, int(v.Value.Meetingid))
+			if !isBusiness {
+				continue
+			} else {
+				meetent = usermap[usetid]
+			}
+
 		}
 		var relayDomIsp string
 		var userDom string
 		var userIsp string
-		var ent string
+
 		var meetid string
-		meetid = strconv.Itoa(v.Value.meetingId)
-		relayid := strings.Split(v.Value.relayIp, ":")
-		userid := strings.Split(v.Value.userIp, ":")
+		meetid = strconv.Itoa(int(v.Value.Meetingid))
+		relayid := strings.Split(v.Value.Relayip, ":")
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknow"
+		}
+		userid := strings.Split(v.Value.Userip, ":")
 		loc, err := ip17mon.Find(userid[0])
 		if err != nil {
-			fmt.Println(err, "144")
+			fmt.Println(err, "162")
 			return
 		}
 		if loc.City == "N/A" {
@@ -175,24 +476,473 @@ func uservideo(conn *mgo.Collection, mintime int32) {
 		} else {
 			userDom = loc.City
 		}
-		userIsp += loc.Isp
-		ent = usermap[usernumber]
-		relayDomIsp = relaymap[relayid[0]]
-		crAvg.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.crAvg))
-		crStd.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.crStd))
-		frAvg.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.frAvg))
-		frStd.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.frStd))
-		delayAvg.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.delayAvg))
-		delayStd.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.delayStd))
-		delayLoss.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.delayLoss))
-		loss.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.loss))
-		lossOrg.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.lossOrg))
-		lossOrgAvg.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.lossOrgAvg))
-		lossOrgStd.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(v.Value.lossOrgStd))
-		if v.Value.dropline == true {
-			dropline.WithLabelValues(v.Id, meetid, ent, ent, userDom, userIsp, relayDomIsp).Set(float64(1))
+		userIsp = loc.Isp
 
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknown"
 		}
+
+		userkeys := userkey{
+			Userid:    v.Id.Userid,
+			Meetintid: meetid,
+			Speakerid: v.Id.Speakerid,
+		}
+
+		if uservideoqualitydown[userkeys].Id.Userid == "" {
+
+			user := uservideoinfo{}
+			user.Id = v.Id
+			user.Value.Meetingid = v.Value.Meetingid
+			user.Value.Userent = userent
+			user.Value.Meetent = meetent
+			user.Value.Devicetype = v.Value.Devicetype
+			user.Value.Networktype = v.Value.Networktype
+			user.Value.Userdom = userDom
+			user.Value.Userisp = userIsp
+			user.Value.Relaydomisp = relayDomIsp
+			user.Value.Crarr = v.Value.Crarr
+			user.Value.Frarr = v.Value.Frarr
+			user.Value.Delayarr = v.Value.Delayarr
+			user.Value.Delayloss = v.Value.Delayloss
+			user.Value.Loss = v.Value.Loss
+			user.Value.Lossorgarr = v.Value.Lossorgarr
+			user.Value.Dropline = v.Value.Dropline
+			v.Value.Users = 1
+			uservideoqualitydown[userkeys] = user
+		} else {
+			user := uservideoqualitydown[userkeys]
+			user.Value.Crarr += "," + v.Value.Crarr
+			user.Value.Frarr += "," + v.Value.Frarr
+			user.Value.Delayarr += "," + v.Value.Delayarr
+			user.Value.Delayloss += v.Value.Delayloss
+			user.Value.Loss += v.Value.Loss
+			user.Value.Lossorgarr += "," + v.Value.Lossorgarr
+			if v.Value.Dropline == true {
+				user.Value.Dropline = true
+			}
+			v.Value.Users += 1
+			uservideoqualitydown[userkeys] = user
+		}
+
 	}
 
+}
+func useraudioup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime int32) {
+
+	mapfunc3 := `function() { 
+        uid = parseInt(this.userId)
+        if(this.userId == this.speakerId &&
+		                   uid > 9999999 &&
+				((this.resourceId == 301 && this.deviceType == 5) || this.resourceId == 200 || (this.resourceId == 201 && this.deviceType == 6))
+				){
+            emit({userid:this.userId, speakerid:this.speakerId} , 
+                  {userIp: this.userIp, 
+                      relayIp: this.relayIp, 
+                      meetingId: this.meetingId,
+                      deviceType: this.deviceType,
+                      networkType: this.networkType,             
+                      deviceType: this.deviceType,
+                      networkType: this.networkType,
+					  one: this.oneEmpty,
+					  two: this.twoEmpty,
+					  three: this.thrEmpty,
+					  foure: this.fouEmpty,
+					  ten: this.tenEmpty}
+                      );
+        }
+    }`
+
+	reducefunc2 := `  function(userId, info) {
+        reducedVal = {
+            userIp: info[0].userIp, 
+            relayIp: info[0].relayIp, 
+            meetingId: info[0].meetingId,
+            deviceType: info[0].deviceType, 
+            networkType: info[0].networkType,             
+            deviceType: info[0].deviceType,
+            networkType: info[0].networkType,
+			one: 0,
+			two: 0,
+			three: 0,
+			foure: 0,
+			ten: 0,
+            };
+        for (var idx = 0; idx < info.length; idx++) {
+            if (info[idx].codeRate === undefined){
+				reducedVal.one += info[idx].one;
+				reducedVal.two += info[idx].two;
+				reducedVal.three += info[idx].three;
+				reducedVal.foure += info[idx].foure;
+				reducedVal.ten += info[idx].ten;
+            }else{
+				if (info[idx].one > 0){
+					reducedVal.one+=info[idx].one;
+				}
+			    if (info[idx].two > 0){
+					reducedVal.two+=info[idx].two;
+				}
+				if (info[idx].three > 0){
+					reducedVal.three+=info[idx].three;
+				}
+				if (info[idx].foure > 0){
+					reducedVal.foure+=info[idx].foure;
+				}
+				if (info[idx].ten > 0){
+					reducedVal.ten+=info[idx].ten;
+				}		                                                          
+            }
+        }
+        return reducedVal
+    }`
+
+	finalizefunc2 := `function(key, val){
+            return {
+                userip: val.userIp,
+                relayip: val.relayIp,
+                meetingid: val.meetingId,     
+                devicetype: val.deviceType,
+                networktype: val.networkType,
+				oneempty: val.one,
+				twoempty: val.two,
+				threeempty: val.three,
+				fourempty: val.foure,
+				tenempty: val.ten,
+                }
+        }`
+	mapreduceaudioup := &mgo.MapReduce{
+		Map:      mapfunc3,
+		Reduce:   reducefunc2,
+		Finalize: finalizefunc2,
+	}
+
+	var uservideosaudioup []uservideoinfo
+
+	_, err := conn.Find(bson.M{"timeStamp": bson.M{"$gte": mintime}}).MapReduce(mapreduceaudioup, &uservideosaudioup)
+	if err != nil {
+		fmt.Println(err, "386")
+		if len(uservideosaudioup) == 0 {
+			return
+		}
+	}
+	relaymap := globeCfg.Output.Relaymap
+	//音频上行
+	for _, v := range uservideosaudioup {
+
+		if v.Id.Userid == "" {
+			continue
+		}
+		if v.Value.Meetingid == 0 {
+			continue
+		}
+		usernumber, err := strconv.ParseInt(v.Id.Userid, 10, 64)
+		if err != nil {
+			continue
+		}
+		var userent string
+		var meetent string
+		userent = usermap[usernumber]
+		meetent = userent
+		if usermap[usernumber] == "非商业" || usermap[usernumber] == "" {
+			userent = "非商业用户"
+			isBusiness, usetid := isBusinessmeet(collectionmeet, int(v.Value.Meetingid))
+			if !isBusiness {
+				continue
+			} else {
+				meetent = usermap[usetid]
+			}
+
+		}
+		var relayDomIsp string
+		var userDom string
+		var userIsp string
+
+		var meetid string
+		meetid = strconv.Itoa(int(v.Value.Meetingid))
+		relayid := strings.Split(v.Value.Relayip, ":")
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknow"
+		}
+		userid := strings.Split(v.Value.Userip, ":")
+		loc, err := ip17mon.Find(userid[0])
+		if err != nil {
+			fmt.Println(err, "162")
+			return
+		}
+		if loc.City == "N/A" {
+			if loc.Region == "N/A" {
+				if loc.Country == "N/A" {
+					userDom = "unknown"
+				} else {
+					userDom = loc.Country
+				}
+			} else {
+				userDom = loc.Region
+			}
+		} else {
+			userDom = loc.City
+		}
+		userIsp = loc.Isp
+
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknown"
+		}
+
+		userkeys := userkey{
+			Userid:    v.Id.Userid,
+			Meetintid: meetid,
+			Speakerid: v.Id.Speakerid,
+		}
+		if uservideoqualityaudioup[userkeys].Id.Userid == "" {
+
+			user := uservideoinfo{}
+			user.Id = v.Id
+			user.Value.Meetingid = v.Value.Meetingid
+			user.Value.Userent = userent
+			user.Value.Meetent = meetent
+			user.Value.Devicetype = v.Value.Devicetype
+			user.Value.Networktype = v.Value.Networktype
+			user.Value.Userdom = userDom
+			user.Value.Userisp = userIsp
+			user.Value.Relaydomisp = relayDomIsp
+
+			user.Value.Oneempty = v.Value.Oneempty
+			user.Value.Twoempty = v.Value.Twoempty
+			user.Value.Threeempty = v.Value.Threeempty
+			user.Value.Fourempty = v.Value.Fourempty
+			user.Value.Tenempty = v.Value.Tenempty
+			user.Value.Users = 1
+			uservideoqualityaudioup[userkeys] = user
+		} else {
+			user := uservideoqualityaudioup[userkeys]
+
+			user.Value.Oneempty += v.Value.Oneempty
+			user.Value.Twoempty += v.Value.Twoempty
+			user.Value.Threeempty += v.Value.Threeempty
+			user.Value.Fourempty += v.Value.Fourempty
+			user.Value.Tenempty += v.Value.Tenempty
+
+			user.Value.Users += 1
+			uservideoqualityaudioup[userkeys] = user
+		}
+
+	}
+
+}
+func useraudiodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime int32) {
+
+	mapfunc4 := `function() { 
+        uid = parseInt(this.userId)
+        if(this.userId != this.speakerId &&
+		                   uid > 9999999 &&
+				((this.resourceId == 301 && this.deviceType == 5) || this.resourceId == 200 || (this.resourceId == 201 && this.deviceType == 6))
+				){
+            emit({userid:this.userId, speakerid:this.speakerId}, 
+                  {userIp: this.userIp, 
+                      relayIp: this.relayIp, 
+                      meetingId: this.meetingId,
+                      deviceType: this.deviceType,
+                      networkType: this.networkType,                      
+                      deviceType: this.deviceType,
+                      networkType: this.networkType,
+					  one: this.oneEmpty,
+					  two: this.twoEmpty,
+					  three: this.thrEmpty,
+					  foure: this.fouEmpty,
+					  ten: this.tenEmpty}
+                      );
+        }
+    }`
+
+	reducefunc2 := `  function(userId, info) {
+        reducedVal = {
+            userIp: info[0].userIp, 
+            relayIp: info[0].relayIp, 
+            meetingId: info[0].meetingId,
+            deviceType: info[0].deviceType, 
+            networkType: info[0].networkType,            
+            deviceType: info[0].deviceType,
+            networkType: info[0].networkType,
+			one: 0,
+			two: 0,
+			three: 0,
+			foure: 0,
+			ten: 0,
+            };
+        for (var idx = 0; idx < info.length; idx++) {
+            if (info[idx].codeRate === undefined){
+				reducedVal.one += info[idx].one;
+				reducedVal.two += info[idx].two;
+				reducedVal.three += info[idx].three;
+				reducedVal.foure += info[idx].foure;
+				reducedVal.ten += info[idx].ten;
+            }else{
+				if (info[idx].one > 0){
+					reducedVal.one+=info[idx].one;
+				}
+			    if (info[idx].two > 0){
+					reducedVal.two+=info[idx].two;
+				}
+				if (info[idx].three > 0){
+					reducedVal.three+=info[idx].three;
+				}
+				if (info[idx].foure > 0){
+					reducedVal.foure+=info[idx].foure;
+				}
+				if (info[idx].ten > 0){
+					reducedVal.ten+=info[idx].ten;
+				}		                                          
+            }
+        }
+        return reducedVal
+    }`
+
+	finalizefunc2 := `function(key, val){
+           
+            return {
+                userip: val.userIp,
+                relayip: val.relayIp,
+                meetingid: val.meetingId,     
+                devicetype: val.deviceType,
+                networktype: val.networkType,
+				oneempty: val.one,
+				twoempty: val.two,
+				threeempty: val.three,
+				fourempty: val.foure,
+				tenempty: val.ten,
+                }
+        }`
+
+	mapreduceaudiodown := &mgo.MapReduce{
+		Map:      mapfunc4,
+		Reduce:   reducefunc2,
+		Finalize: finalizefunc2,
+	}
+
+	var uservideosaudiodown []uservideoinfo
+	_, err := conn.Find(bson.M{"timeStamp": bson.M{"$gte": mintime}}).MapReduce(mapreduceaudiodown, &uservideosaudiodown)
+	if err != nil {
+		fmt.Println(err, "393")
+		if len(uservideosaudiodown) == 0 {
+			return
+		}
+	}
+	relaymap := globeCfg.Output.Relaymap
+	//音频下行
+	for _, v := range uservideosaudiodown {
+
+		if v.Id.Userid == "" {
+			continue
+		}
+		if v.Value.Meetingid == 0 {
+			continue
+		}
+		usernumber, err := strconv.ParseInt(v.Id.Userid, 10, 64)
+		if err != nil {
+			continue
+		}
+		var userent string
+		var meetent string
+		userent = usermap[usernumber]
+		meetent = userent
+		if usermap[usernumber] == "非商业" || usermap[usernumber] == "" {
+			userent = "非商业用户"
+			isBusiness, usetid := isBusinessmeet(collectionmeet, int(v.Value.Meetingid))
+			if !isBusiness {
+				continue
+			} else {
+				meetent = usermap[usetid]
+			}
+
+		}
+		var relayDomIsp string
+		var userDom string
+		var userIsp string
+
+		var meetid string
+		meetid = strconv.Itoa(int(v.Value.Meetingid))
+		relayid := strings.Split(v.Value.Relayip, ":")
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknow"
+		}
+		userid := strings.Split(v.Value.Userip, ":")
+		loc, err := ip17mon.Find(userid[0])
+		if err != nil {
+			fmt.Println(err, "162")
+			return
+		}
+		if loc.City == "N/A" {
+			if loc.Region == "N/A" {
+				if loc.Country == "N/A" {
+					userDom = "unknown"
+				} else {
+					userDom = loc.Country
+				}
+			} else {
+				userDom = loc.Region
+			}
+		} else {
+			userDom = loc.City
+		}
+		userIsp = loc.Isp
+
+		if relaymap[relayid[0]] != "" {
+			relayDomIsp = relaymap[relayid[0]]
+		} else {
+			relayDomIsp = "unknown"
+		}
+
+		userkeys := userkey{
+			Userid:    v.Id.Userid,
+			Meetintid: meetid,
+			Speakerid: v.Id.Speakerid,
+		}
+		if uservideoqualityaudiodown[userkeys].Id.Userid == "**" {
+			continue
+		}
+		if uservideoqualityaudiodown[userkeys].Id.Userid == "" {
+
+			user := uservideoinfo{}
+			user.Id = v.Id
+			user.Value.Meetingid = v.Value.Meetingid
+			user.Value.Userent = userent
+			user.Value.Meetent = meetent
+			user.Value.Devicetype = v.Value.Devicetype
+			user.Value.Networktype = v.Value.Networktype
+			user.Value.Userdom = userDom
+			user.Value.Userisp = userIsp
+			user.Value.Relaydomisp = relayDomIsp
+			user.Value.Oneempty = v.Value.Oneempty
+			user.Value.Twoempty = v.Value.Twoempty
+			user.Value.Threeempty = v.Value.Threeempty
+			user.Value.Fourempty = v.Value.Fourempty
+			user.Value.Tenempty = v.Value.Tenempty
+			user.Value.Users = 1
+			uservideoqualityaudiodown[userkeys] = user
+		} else {
+			user := uservideoqualityaudiodown[userkeys]
+			user.Value.Oneempty += v.Value.Oneempty
+			user.Value.Twoempty += v.Value.Twoempty
+			user.Value.Threeempty += v.Value.Threeempty
+			user.Value.Fourempty += v.Value.Fourempty
+			user.Value.Tenempty += v.Value.Tenempty
+			user.Value.Users += 1
+			uservideoqualityaudiodown[userkeys] = user
+		}
+
+	}
+
+}
+func userVideoAudioUpAndDown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime int32) {
+	uservideoup(conn, collectionmeet, mintime)
+	uservideodown(conn, collectionmeet, mintime)
+	useraudioup(conn, collectionmeet, mintime)
+	useraudiodown(conn, collectionmeet, mintime)
 }

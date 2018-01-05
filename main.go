@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/axgle/mahonia"
+	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -95,26 +96,34 @@ type p2pispcity struct {
 	}
 }
 type uservideoinfo struct {
-	Id    string "_id"
+	Id struct {
+		Userid    string
+		Speakerid string
+	} "_id"
 	Value struct {
-		users       int
-		userIp      string
-		relayIp     string
-		meetingId   int
-		deviceType  int
-		networkType int
-		crAvg       int
-		crStd       int
-		frAvg       int
-		frStd       int
-		lossOrg     int
-		lossOrgAvg  int
-		lossOrgStd  int
-		loss        int
-		delayAvg    int
-		delayStd    int
-		delayLoss   int
-		dropline    bool
+		Userip      string
+		Relayip     string
+		Userent     string
+		Meetent     string
+		Userdom     string
+		Userisp     string
+		Relaydomisp string
+		Meetingid   float64
+		Devicetype  int
+		Networktype int
+		Crarr       string
+		Frarr       string
+		Lossorgarr  string
+		Loss        float64
+		Delayarr    string
+		Delayloss   int
+		Dropline    bool
+		Users       float64
+		Oneempty    int
+		Twoempty    int
+		Threeempty  int
+		Fourempty   int
+		Tenempty    int
 	}
 }
 type relayflow struct {
@@ -232,8 +241,25 @@ var weekOldusersmeet map[string]int
 var monOldusersmeet map[string]int
 
 //视频体验统计
-var uservideoquality map[string]uservideoinfo
-var relayvideoquality map[string]uservideoinfo
+type userkey struct {
+	Userid    string
+	Meetintid string
+	Speakerid string
+}
+
+var uservideoqualityup map[userkey]uservideoinfo
+var uservideoqualitydown map[userkey]uservideoinfo
+var uservideoqualityaudioup map[userkey]uservideoinfo
+var uservideoqualityaudiodown map[userkey]uservideoinfo
+var devmeet map[string]string
+var netmeet map[string]string
+
+type usertime struct {
+	userid    string
+	entname   string
+	starttime time.Time
+	endtime   time.Time
+}
 
 //prometheus var
 var (
@@ -259,8 +285,13 @@ var (
 	lossOrg         *(prometheus.GaugeVec)
 	lossOrgAvg      *(prometheus.GaugeVec)
 	lossOrgStd      *(prometheus.GaugeVec)
+	Emptyaudiobag   *(prometheus.GaugeVec)
 	//解析excal后生成的map
 	usermap map[int64]string
+	//临时usermap
+	temporaryUser map[int]usertime
+	//临时usermap的key
+	keyid int
 )
 
 //获取当前各个企业视频号号段范围
@@ -293,8 +324,11 @@ func getNumber(db *sql.DB) {
 	dayOldusersmeet = make(map[string]int)
 	weekOldusersmeet = make(map[string]int)
 	monOldusersmeet = make(map[string]int)
-	uservideoquality = make(map[string]uservideoinfo)
-	relayvideoquality = make(map[string]uservideoinfo)
+	uservideoqualityup = make(map[userkey]uservideoinfo)
+	uservideoqualitydown = make(map[userkey]uservideoinfo)
+	uservideoqualityaudioup = make(map[userkey]uservideoinfo)
+	uservideoqualityaudiodown = make(map[userkey]uservideoinfo)
+	temporaryUser = make(map[int]usertime)
 	dommap = globeCfg.Output.Dom
 	ispmap = globeCfg.Output.Isp
 	devp2pmap = globeCfg.Output.Devp2p
@@ -341,191 +375,8 @@ func getNumber(db *sql.DB) {
 	}
 }
 
-//推送数据
-func Observe() {
-
-	synode.WithLabelValues("nowuser").Set(float64(syuser["now"]))
-	synode.WithLabelValues("newuser").Set(float64(syuser["new"]))
-	synode.WithLabelValues("realuser").Set(float64(syuser["realuser"]))
-
-	syuser["now"] = 0
-	syuser["new"] = 0
-	syuser["realuser"] = 0
-	//当前企业通话数
-	for k, v := range entToNumber1 {
-		nodenow.WithLabelValues(k, "Now").Set(float64(v))
-		entToNumber1[k] = 0
-	}
-	//新增企业通话数
-	for k, v := range entToNumber2 {
-		nodenow.WithLabelValues(k, "New").Set(float64(v))
-		entToNumber2[k] = 0
-	}
-	//企业未接通数
-	for k, v := range entToNumber3 {
-		nodenow.WithLabelValues(k, "CallFail").Set(float64(v))
-		entToNumber3[k] = 0
-	}
-	//企业延迟插入的通话数（时间与实际时间相差5m及以上）
-
-	for k, v := range entToNumber4 {
-		nodenow.WithLabelValues(k, "Glean").Set(float64(v))
-		entToNumber4[k] = 0
-	}
-	//企业通话总时长
-	for k, v := range entToNumber5 {
-		nodenowcalltime.WithLabelValues(k, "CallTime").Set(float64(v))
-		entToNumber5[k] = 0
-	}
-	//按地域划分的通话数（p2p）
-	for k, v := range domToNumber {
-		if dommap[k] == "" {
-			nodecallip.WithLabelValues("unknown", "dom").Set(float64(v))
-		} else {
-			nodecallip.WithLabelValues(dommap[k], "dom").Set(float64(v))
-		}
-		domToNumber[k] = 0
-	}
-	//按运营商划分的通话数（p2p）
-	for k, v := range ispToNumber {
-		if ispmap[k] == "" {
-			nodecallip.WithLabelValues("unknown", "isp").Set(float64(v))
-		} else {
-			nodecallip.WithLabelValues(ispmap[k], "isp").Set(float64(v))
-		}
-		ispToNumber[k] = 0
-	}
-	fmt.Println("devp2p", devToNumber)
-	//按设备类型划分的通话数（p2p）
-	for k, v := range devToNumber {
-		if devp2pmap[k] == "" {
-			nodecallip.WithLabelValues("unknown", "dev").Set(float64(v))
-		} else {
-			nodecallip.WithLabelValues(devp2pmap[k], "dev").Set(float64(v))
-		}
-		devToNumber[k] = 0
-	}
-	//按网络类型划分的通话数（p2p）
-	for k, v := range netToNumber {
-		if netp2pmap[k] == "" {
-			nodecallip.WithLabelValues("unknown", "net").Set(float64(v))
-		} else {
-			nodecallip.WithLabelValues(netp2pmap[k], "net").Set(float64(v))
-		}
-
-		netToNumber[k] = 0
-	}
-	//企业通话时长（meet）
-	fmt.Println("entTocallTime: ", entTocallTime)
-	for k, v := range entTocallTime {
-		entcalltimemeet.WithLabelValues(k).Set(float64(v))
-		entTocallTime[k] = 0
-	}
-	//按地域划分的通话数（meet）
-	fmt.Println("domToNumbermeet: ", domToNumbermeet)
-	for k, v := range domToNumbermeet {
-		entipmeet.WithLabelValues(k, "dom").Set(float64(v))
-		domToNumbermeet[k] = 0
-	}
-	//按运营商划分的通话数（meet）
-	fmt.Println("ispToNumbermeet: ", ispToNumbermeet)
-	for k, v := range ispToNumbermeet {
-		entipmeet.WithLabelValues(k, "isp").Set(float64(v))
-		ispToNumbermeet[k] = 0
-	}
-	//按设备类型划分的通话数（meet）
-	fmt.Println("devToNumbermeet: ", devToNumbermeet)
-	for k, v := range devToNumbermeet {
-		entipmeet.WithLabelValues(k, "dev").Set(float64(v))
-		devToNumbermeet[k] = 0
-	}
-	//按网络类型划分的通话数（meet）
-	fmt.Println("netToNumbermeet: ", netToNumbermeet)
-	for k, v := range netToNumbermeet {
-		entipmeet.WithLabelValues(k, "net").Set(float64(v))
-		netToNumbermeet[k] = 0
-	}
-	fmt.Println("meetrelayup: ", meetrelayup)
-	for k, v := range meetrelayup {
-		meetrelay.WithLabelValues(k, "up").Set(float64(v))
-		meetrelayup[k] = 0
-	}
-	for k, v := range meetrelaydown {
-		meetrelay.WithLabelValues(k, "down").Set(float64(v))
-		meetrelaydown[k] = 0
-	}
-	//p2p用户活跃统计
-	fmt.Println("newusersp2p: ", newusersp2p)
-	for k, v := range newusersp2p {
-		p2pactive.WithLabelValues(k, "new").Set(float64(v))
-		newusersp2p[k] = 0
-	}
-	for k, v := range monOldusersp2p {
-		p2pactive.WithLabelValues(k, "mon").Set(float64(v))
-		monOldusersp2p[k] = 0
-	}
-
-	for k, v := range weekOldusersp2p {
-		p2pactive.WithLabelValues(k, "week").Set(float64(v))
-		weekOldusersp2p[k] = 0
-	}
-	for k, v := range dayOldusersp2p {
-		p2pactive.WithLabelValues(k, "day").Set(float64(v))
-		dayOldusersp2p[k] = 0
-	}
-	//meet用户活跃统计
-	fmt.Println("newusersmeet: ", newusersmeet)
-	for k, v := range newusersmeet {
-		meetactive.WithLabelValues(k, "new").Set(float64(v))
-		newusersmeet[k] = 0
-	}
-	for k, v := range monOldusersmeet {
-		meetactive.WithLabelValues(k, "mon").Set(float64(v))
-		monOldusersmeet[k] = 0
-	}
-
-	for k, v := range weekOldusersmeet {
-		meetactive.WithLabelValues(k, "week").Set(float64(v))
-		weekOldusersmeet[k] = 0
-	}
-	for k, v := range dayOldusersmeet {
-		meetactive.WithLabelValues(k, "day").Set(float64(v))
-		dayOldusersmeet[k] = 0
-	}
-
-	fmt.Println("puseOK")
-}
-
-//推送现在正在会议的数量
-func Observemeet(meetumber int) {
-
-	node.WithLabelValues("meet").Set(float64(meetumber))
-}
-
-//推送商业用户的会议数量
-func syObserve(meetumber int, nowuser int, newuser int) {
-	fmt.Println("商业会议数量", meetumber, "在线用户", nowuser, "新增用户", newuser)
-	synode.WithLabelValues("meet").Set(float64(meetumber))
-
-}
-
-//加载配置文件
-func loadConfig() {
-	if err := ip17mon.Init("mydata4vipweek2.dat"); err != nil {
-		panic(err)
-	}
-	cfgbuf, err := ioutil.ReadFile("cfg.yaml")
-	if err != nil {
-		panic("not found cfg.yaml")
-	}
-	rfig := RConfig{}
-	err = yaml.Unmarshal(cfgbuf, &rfig)
-	if err != nil {
-		panic("invalid cfg.yaml")
-	}
-	globeCfg = &rfig
-	fmt.Println("Load config -'cfg.yaml'- ok...")
-	//加载excal文件
+//加载用户excel文件
+func loadexcel() {
 	usermap = make(map[int64]string)
 	excelFileName := "user.xlsx"
 	xlFile, err := xlsx.OpenFile(excelFileName)
@@ -554,14 +405,42 @@ func loadConfig() {
 			}
 		}
 	}
-	for k, v := range usermap {
-		fmt.Println(k, v)
+	timenow := time.Now().Unix()
+	for _, v := range temporaryUser {
+		if timenow > v.starttime.Unix() && timenow < v.endtime.Unix() {
+			uid, _ := strconv.Atoi(v.userid)
+			usermap[int64(uid)] = v.entname
+		}
+		if timenow > v.endtime.Unix() {
+			uid, _ := strconv.Atoi(v.userid)
+			delete(usermap, int64(uid))
+		}
 	}
+
+}
+
+//加载配置文件
+func loadConfig() {
+	if err := ip17mon.Init("mydata4vipweek2.dat"); err != nil {
+		panic(err)
+	}
+	cfgbuf, err := ioutil.ReadFile("cfg.yaml")
+	if err != nil {
+		panic("not found cfg.yaml")
+	}
+	rfig := RConfig{}
+	err = yaml.Unmarshal(cfgbuf, &rfig)
+	if err != nil {
+		panic("invalid cfg.yaml")
+	}
+	globeCfg = &rfig
+	fmt.Println("Load config -'cfg.yaml'- ok...")
 
 }
 func init() {
 	loadConfig() //加载配置文件
-
+	devmeet = globeCfg.Output.Devmeet
+	netmeet = globeCfg.Output.Netmeet
 	nodenow = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "p2p",
 		Subsystem: "entToNumber",
@@ -646,25 +525,33 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	crStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
-		Name:      "crStd ",
+		Name:      "crStd",
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	frAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -672,12 +559,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	frStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -685,12 +576,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	delayAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -698,12 +593,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	delayStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -711,12 +610,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	delayLoss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -724,12 +627,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	dropline = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -737,12 +644,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	loss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -750,12 +661,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	lossOrg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -763,12 +678,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	lossOrgAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -776,12 +695,16 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
 	lossOrgStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -789,12 +712,34 @@ func init() {
 		Help:      "state",
 	}, []string{
 		"userId",
+		"Speakerid",
 		"meetingId",
+		"deviceType",
+		"networkType",
 		"userEnt",
 		"meetEnt",
 		"userDom",
 		"userIsp",
-		"relayDomIsp"})
+		"relayDomIsp",
+		"updown"})
+	Emptyaudiobag = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "Emptyaudiobag",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"emptygrades"})
 	prometheus.MustRegister(node)
 	prometheus.MustRegister(synode)
 	prometheus.MustRegister(nodenow)
@@ -817,11 +762,11 @@ func init() {
 	prometheus.MustRegister(lossOrg)
 	prometheus.MustRegister(lossOrgAvg)
 	prometheus.MustRegister(lossOrgStd)
+	prometheus.MustRegister(Emptyaudiobag)
 
 }
 
 func main() {
-	//判断活跃用户的模块
 
 	ruc = &gproto.RecUserClient{}
 	cnlogS := globeCfg.Output.CnlogS
@@ -865,6 +810,9 @@ func main() {
 
 		fmt.Println("dbOK")
 		for {
+
+			//加载用户excel文件
+			loadexcel()
 			//从mongodb中获取数据
 			toPromtheus(mip, mdb, mtable1)
 			getCall(collection)
@@ -893,10 +841,29 @@ func main() {
 			http.ListenAndServe(fmt.Sprintf("%s:%d", globeCfg.Gw.Addr, globeCfg.Gw.HttpListenPort), nil)
 		}()
 	}
-
+	//开启aduser接口端口10088
+	go func() {
+		router := gin.Default()
+		router.GET("adduser", adduser)
+		router.GET("showuser", showuser)
+		router.GET("deleteuser", deleteuser)
+		router.GET("updateuser", updateuser)
+		router.Run(":10088")
+	}()
 	c := make(chan os.Signal, 1)
 	signal.Notify(c)
 	//	signal.Notify(c, os.Interrupt, os.Kill)
 	s := <-c
 	fmt.Println("exitss", s)
+}
+
+//字符串数组转换为float数组
+func strArrToFloatArr(strArr []string) []float64 {
+	i := len(strArr)
+	floatArr := make([]float64, i)
+	for i, v := range strArr {
+		f, _ := strconv.ParseFloat(v, 64)
+		floatArr[i] = f
+	}
+	return floatArr
 }

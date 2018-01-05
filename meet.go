@@ -83,7 +83,7 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 		var relayflows []relayflow
 		collection := meetsession.DB("meetingDB").C(tablemeet)
 		//用户体验统计
-		uservideo(collection, min10time)
+		userVideoAudioUpAndDown(collection, collection3, min10time)
 		_, err := collection.Find(bson.M{"timeStamp": bson.M{"$gte": min10time}}).MapReduce(mapreduce, &meet2MapReduces)
 		if err != nil {
 			fmt.Println(err, "74")
@@ -109,13 +109,13 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 			meetrelaydown[ID] += v.Value.Downbw
 		}
 		fmt.Println("1 ", "查询meet总总数（5m）: ", len(meet2MapReduces), "表名: ", tablemeet)
-		fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
-		fmt.Println("查询会议relay内容（relayflows）：", relayflows)
+		//fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
+		//fmt.Println("查询会议relay内容（relayflows）：", relayflows)
 
 		for _, v := range meet2MapReduces {
 			id, _ := strconv.Atoi(v.Id)
 			//当前用户在商业会议中的数量
-			isBusiness := isBusinessmeet(collection3, v.Value.Meetid)
+			isBusiness, _ := isBusinessmeet(collection3, v.Value.Meetid)
 			if isBusiness {
 				fmt.Println("1在商业会议中user", id)
 				syuser["realuser"]++
@@ -171,7 +171,7 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 
 				collection2 := meetsession.DB("meetingDB").C(meettable)
 				//用户体验统计
-				uservideo(collection2, min10time)
+				userVideoAudioUpAndDown(collection2, collection3, min10time)
 				_, err := collection2.Find(bson.M{"timeStamp": bson.M{"$gte": min10time}}).MapReduce(mapreduce, &meet2MapReduces)
 				if err != nil {
 					fmt.Println(err, "135")
@@ -197,13 +197,13 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 					meetrelaydown[ID] += v.Value.Downbw
 				}
 				fmt.Println("2 ", "查询meet总总数（5m）: ", len(meet2MapReduces), "表名: ", meettable)
-				fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
-				fmt.Println("查询会议relay内容（relayflows）：", relayflows)
+				//fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
+				//fmt.Println("查询会议relay内容（relayflows）：", relayflows)
 				for _, v := range meet2MapReduces {
 					id, _ := strconv.Atoi(v.Id)
 					if userlist[id] == 0 {
 						//用户是否在商业会议中
-						isBusiness := isBusinessmeet(collection3, v.Value.Meetid)
+						isBusiness, _ := isBusinessmeet(collection3, v.Value.Meetid)
 
 						if isBusiness {
 							fmt.Println("2在商业会议中user", id)
@@ -258,7 +258,8 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 			var relayflows []relayflow
 			collection2 := meetsession.DB("meetingDB").C(tablemeet)
 			//用户体验统计
-			uservideo(collection2, min10time)
+			userVideoAudioUpAndDown(collection2, collection3, min10time)
+
 			_, err := collection2.Find(bson.M{"timeStamp": bson.M{"$gte": min10time}}).MapReduce(mapreduce, &meet2MapReduces)
 			if err != nil {
 				fmt.Println(err, "178")
@@ -284,12 +285,12 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 				meetrelaydown[ID] += v.Value.Downbw
 			}
 			fmt.Println("3 ", "查询meet总总数（5m）: ", len(meet2MapReduces), "表名: ", tablemeet)
-			fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
-			fmt.Println("查询会议relay内容（relayflows）：", relayflows)
+			//	fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
+			//fmt.Println("查询会议relay内容（relayflows）：", relayflows)
 			for _, v := range meet2MapReduces {
 
 				//用户是否在商业会议中
-				isBusiness := isBusinessmeet(collection3, v.Value.Meetid)
+				isBusiness, _ := isBusinessmeet(collection3, v.Value.Meetid)
 				if isBusiness {
 					syuser["realuser"]++
 				}
@@ -365,8 +366,6 @@ func toPromtheus(ip string, db string, table1 string) {
 	}
 	Observemeet(len(meetinfos))
 	sumber := 0
-	newusers := 0
-	nowuser := 0
 	i := list.New()
 	for _, v := range meetinfos {
 		//fmt.Println(v.EndTime)
@@ -379,18 +378,13 @@ func toPromtheus(ip string, db string, table1 string) {
 			if usermap[intv2] != "非商业" && usermap[intv2] != "" {
 				fmt.Println("商业会议id", v.MeetingId, intv2)
 				i.PushBack(v.MeetingId)
-				if v.StartTime >= min10time {
-					newusers = newusers + v.UserCount
-
-				}
-				nowuser = nowuser + v.UserCount
 				sumber++
 				break
 			}
 		}
 	}
 	timelist = *i
-	syObserve(sumber, nowuser, newusers)
+	syObserve(sumber)
 
 }
 
@@ -438,21 +432,21 @@ func isActivemeet(user int64, callId string) (err error, newuser, monOlduser, we
 
 }
 
-func isBusinessmeet(collection *mgo.Collection, meetid int) bool {
+func isBusinessmeet(collection *mgo.Collection, meetid int) (bool, int64) {
 	var meetinfoOne meetinfo
 	err := collection.Find(bson.M{"meetingId": meetid}).Select(bson.M{"userIdList": 1}).One(&meetinfoOne)
 	if err != nil {
 		fmt.Println(meetid)
 		fmt.Println(err, "426")
-		return false
+		return false, 0
 	}
 	userlist := strings.Split(meetinfoOne.UserIdList, "_")
 	for _, v := range userlist {
 		intuserid, _ := strconv.ParseInt(v, 10, 64)
 		if usermap[intuserid] != "非商业" && usermap[intuserid] != "" {
-			return true
+			return true, intuserid
 		}
 	}
-	return false
+	return false, 0
 
 }
