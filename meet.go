@@ -113,6 +113,7 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 		//fmt.Println("查询会议relay内容（relayflows）：", relayflows)
 
 		for _, v := range meet2MapReduces {
+			syuser["alluser"]++
 			id, _ := strconv.Atoi(v.Id)
 			//当前用户在商业会议中的数量
 			isBusiness, _ := isBusinessmeet(collection3, v.Value.Meetid)
@@ -202,12 +203,14 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 				for _, v := range meet2MapReduces {
 					id, _ := strconv.Atoi(v.Id)
 					if userlist[id] == 0 {
+						userlist[id] = 1
+						syuser["alluser"]++
 						//用户是否在商业会议中
 						isBusiness, _ := isBusinessmeet(collection3, v.Value.Meetid)
 
 						if isBusiness {
 							fmt.Println("2在商业会议中user", id)
-							userlist[id] = 1
+
 							syuser["realuser"]++
 						}
 						if usermap[int64(id)] == "非商业" || usermap[int64(id)] == "" {
@@ -288,7 +291,7 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 			//	fmt.Println("meet内容（meet2MapReduces）: ", meet2MapReduces)
 			//fmt.Println("查询会议relay内容（relayflows）：", relayflows)
 			for _, v := range meet2MapReduces {
-
+				syuser["alluser"]++
 				//用户是否在商业会议中
 				isBusiness, _ := isBusinessmeet(collection3, v.Value.Meetid)
 				if isBusiness {
@@ -359,6 +362,11 @@ func toPromtheus(ip string, db string, table1 string) {
 	}
 
 	meetEntToTime(session, nowtime, min10time)
+
+	meetqualifiedsconn := session.DB("meetingDB").C("MeetingInfoSummary_FourTable")
+
+	getmeetqualifieds(meetqualifiedsconn, min10time)
+
 	var meetinfos []meetinfo
 	err = collection.Find(bson.M{"endTime": bson.M{"$gte": min10time}}).Select(bson.M{"meetingId": 1, "duration": 1, "startTime": 1, "endTime": 1, "userIdList": 1, "userCount": 1, "qosTableName": 1}).All(&meetinfos)
 	if err != nil {
@@ -432,6 +440,7 @@ func isActivemeet(user int64, callId string) (err error, newuser, monOlduser, we
 
 }
 
+//判断是否是商业会议
 func isBusinessmeet(collection *mgo.Collection, meetid int) (bool, int64) {
 	var meetinfoOne meetinfo
 	err := collection.Find(bson.M{"meetingId": meetid}).Select(bson.M{"userIdList": 1}).One(&meetinfoOne)

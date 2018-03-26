@@ -11,14 +11,18 @@ import (
 
 //推送数据
 func Observe() {
-
+	//当前商业会议在线人数
 	synode.WithLabelValues("nowuser").Set(float64(syuser["now"]))
+	//当前商业会议新增人数
 	synode.WithLabelValues("newuser").Set(float64(syuser["new"]))
+	//当前参加商业会议的人数
 	synode.WithLabelValues("realuser").Set(float64(syuser["realuser"]))
-
+	//当前参加会议得人数
+	synode.WithLabelValues("alluser").Set(float64(syuser["alluser"]))
 	syuser["now"] = 0
 	syuser["new"] = 0
 	syuser["realuser"] = 0
+	syuser["alluser"] = 0
 	//当前企业通话数
 	for k, v := range entToNumber1 {
 		nodenow.WithLabelValues(k, "Now").Set(float64(v))
@@ -113,7 +117,7 @@ func Observe() {
 		entipmeet.WithLabelValues(k, "net").Set(float64(v))
 		netToNumbermeet[k] = 0
 	}
-	fmt.Println("meetrelayup: ", meetrelayup)
+
 	for k, v := range meetrelayup {
 		meetrelay.WithLabelValues(k, "up").Set(float64(v))
 		meetrelayup[k] = 0
@@ -160,12 +164,9 @@ func Observe() {
 		meetactive.WithLabelValues(k, "day").Set(float64(v))
 		dayOldusersmeet[k] = 0
 	}
-	//用户体验
-	fmt.Println("用户体验up map", uservideoqualityup)
-	fmt.Println("用户体验down map", uservideoqualitydown)
-	//视频上行
-	for k, v := range uservideoqualityup {
-		fmt.Println("up视频输出", v.Id, v.Value.Meetingid)
+	//文档上行
+	for k, v := range userfilequalityup {
+
 		if v.Value.Crarr != "" && v.Value.Frarr != "" && v.Value.Delayarr != "" {
 			var dev, net string
 			CrfloatArr := strArrToFloatArr(strings.Split(v.Value.Crarr, ","))
@@ -176,6 +177,11 @@ func Observe() {
 			Networktypestr := strconv.Itoa(v.Value.Networktype)
 			if devmeet[Devicetypestr] != "" {
 				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
+
 			} else {
 				dev = "unknown"
 			}
@@ -184,6 +190,8 @@ func Observe() {
 			} else {
 				net = "unknown"
 			}
+			//上行最大延迟
+			maxdelayup, _ = stats.Max(delayfloatArr)
 
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
 			crAvgValue, _ := stats.Mean(CrfloatArr)
@@ -201,23 +209,25 @@ func Observe() {
 					lossorg++
 				}
 			}
-			fmt.Println("crAvgValue", crAvgValue)
-			fmt.Println("frAvgValue", frAvgValue)
-			fmt.Println("delayAvgValue", delayAvgValue)
-			fmt.Println("lossorg", lossorg)
-			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(crAvgValue)))
-			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(crStdValue)))
-			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(frAvgValue)))
-			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(frStdValue)))
-			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(delayAvgValue)))
-			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(delayStdValue)))
-			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(v.Value.Delayloss)))
-			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(v.Value.Loss)))
-			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(lossorg)))
-			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(lossAvgValue)))
-			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(int64(lossStdValue)))
+			//			fmt.Println("crAvgValue", crAvgValue, "|", v.Value.Crarr)
+			//			fmt.Println("frAvgValue", frAvgValue, "|", v.Value.Frarr)
+			//			fmt.Println("delayAvgValue", delayAvgValue, "|", v.Value.Delayarr)
+			//			fmt.Println("lossAvgValue", lossAvgValue, "|", v.Value.Lossorgarr, "|", lossfloatArr)
+			//			fmt.Println("lossorg", lossorg)
+			filecrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(crAvgValue)))
+			filecrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(crStdValue)))
+			filefrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(frAvgValue)))
+			filefrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(frStdValue)))
+			filedelayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(delayAvgValue)))
+			filedelayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(delayStdValue)))
+			filedelayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(v.Value.Delayloss)))
+			fileloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(v.Value.Loss)))
+			filelossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(lossorg)))
+			filelossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(lossAvgValue)))
+			filelossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(lossStdValue)))
+			filevideomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(maxdelayup)
 			if v.Value.Dropline == true {
-				dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(1))
+				filedropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(1))
 
 			}
 		} else {
@@ -226,6 +236,10 @@ func Observe() {
 			Networktypestr := strconv.Itoa(v.Value.Networktype)
 			if devmeet[Devicetypestr] != "" {
 				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
 			} else {
 				dev = "unknown"
 			}
@@ -235,18 +249,242 @@ func Observe() {
 				net = "unknown"
 			}
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
-			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
-			dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up").Set(float64(0))
+			filecrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filecrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filefrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filefrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filedelayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filedelayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filedelayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			fileloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filelossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filelossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filelossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filedropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			filevideomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			delete(userfilequalityup, k)
+		}
+
+		user := userfilequalityup[k]
+		user.Value.Crarr = ""
+		user.Value.Frarr = ""
+		user.Value.Delayarr = ""
+		user.Value.Delayloss = 0
+		user.Value.Loss = 0
+		user.Value.Lossorgarr = ""
+		user.Value.Dropline = false
+		user.Value.Users = 0
+		userfilequalityup[k] = user
+	}
+	//文档下行
+	for k, v := range userfilequalitydown {
+
+		if v.Value.Crarr != "" && v.Value.Frarr != "" && v.Value.Delayarr != "" {
+			var dev, net string
+			CrfloatArr := strArrToFloatArr(strings.Split(v.Value.Crarr, ","))
+			FrfloatArr := strArrToFloatArr(strings.Split(v.Value.Frarr, ","))
+			delayfloatArr := strArrToFloatArr(strings.Split(v.Value.Delayarr, ","))
+			lossfloatArr := strArrToFloatArr(strings.Split(v.Value.Lossorgarr, ","))
+			Devicetypestr := strconv.Itoa(v.Value.Devicetype)
+			Networktypestr := strconv.Itoa(v.Value.Networktype)
+			if devmeet[Devicetypestr] != "" {
+				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
+
+			} else {
+				dev = "unknown"
+			}
+			if netmeet[Networktypestr] != "" {
+				net = netmeet[Networktypestr]
+			} else {
+				net = "unknown"
+			}
+			maxdelaydown, _ = stats.Max(delayfloatArr)
+			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
+			crAvgValue, _ := stats.Mean(CrfloatArr)
+			crStdValue, _ := stats.StandardDeviationPopulation(CrfloatArr)
+			frAvgValue, _ := stats.Mean(FrfloatArr)
+			frStdValue, _ := stats.StandardDeviationPopulation(FrfloatArr)
+			delayAvgValue, _ := stats.Mean(delayfloatArr)
+			delayStdValue, _ := stats.StandardDeviationPopulation(delayfloatArr)
+			lossAvgValue, _ := stats.Mean(lossfloatArr)
+			lossStdValue, _ := stats.StandardDeviationPopulation(lossfloatArr)
+
+			var lossorg float64
+
+			for _, v := range lossfloatArr {
+				if v != 0 {
+					lossorg++
+				}
+			}
+			//			fmt.Println("crAvgValue", crAvgValue, "|", v.Value.Crarr)
+			//			fmt.Println("frAvgValue", frAvgValue, "|", v.Value.Frarr)
+			//			fmt.Println("delayAvgValue", delayAvgValue, "|", v.Value.Delayarr)
+			//			fmt.Println("lossAvgValue", lossAvgValue, "|", v.Value.Lossorgarr, "|", lossfloatArr)
+			//			fmt.Println("lossorg", lossorg)
+			filecrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(crAvgValue)))
+			filecrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(crStdValue)))
+			filefrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(frAvgValue)))
+			filefrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(frStdValue)))
+			filedelayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(delayAvgValue)))
+			filedelayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(delayStdValue)))
+			filedelayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(v.Value.Delayloss)))
+			fileloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(v.Value.Loss)))
+			filelossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(lossorg)))
+			filelossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(lossAvgValue)))
+			filelossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(lossStdValue)))
+			filevideomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(maxdelaydown))
+			if v.Value.Dropline == true {
+				filedropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(1))
+
+			}
+		} else {
+			var dev, net string
+			Devicetypestr := strconv.Itoa(v.Value.Devicetype)
+			Networktypestr := strconv.Itoa(v.Value.Networktype)
+			if devmeet[Devicetypestr] != "" {
+				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
+			} else {
+				dev = "unknown"
+			}
+			if netmeet[Networktypestr] != "" {
+				net = netmeet[Networktypestr]
+			} else {
+				net = "unknown"
+			}
+			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
+			filecrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filecrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filefrAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filefrStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filedelayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filedelayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filedelayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			fileloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filelossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filelossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filelossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filedropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			filevideomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			delete(userfilequalitydown, k)
+		}
+
+		user := userfilequalitydown[k]
+		user.Value.Crarr = ""
+		user.Value.Frarr = ""
+		user.Value.Delayarr = ""
+		user.Value.Delayloss = 0
+		user.Value.Loss = 0
+		user.Value.Lossorgarr = ""
+		user.Value.Dropline = false
+		user.Value.Users = 0
+		userfilequalitydown[k] = user
+	}
+	//视频上行
+	for k, v := range uservideoqualityup {
+
+		if v.Value.Crarr != "" && v.Value.Frarr != "" && v.Value.Delayarr != "" {
+			var dev, net string
+			CrfloatArr := strArrToFloatArr(strings.Split(v.Value.Crarr, ","))
+			FrfloatArr := strArrToFloatArr(strings.Split(v.Value.Frarr, ","))
+			delayfloatArr := strArrToFloatArr(strings.Split(v.Value.Delayarr, ","))
+			lossfloatArr := strArrToFloatArr(strings.Split(v.Value.Lossorgarr, ","))
+			Devicetypestr := strconv.Itoa(v.Value.Devicetype)
+			Networktypestr := strconv.Itoa(v.Value.Networktype)
+			if devmeet[Devicetypestr] != "" {
+				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
+
+			} else {
+				dev = "unknown"
+			}
+			if netmeet[Networktypestr] != "" {
+				net = netmeet[Networktypestr]
+			} else {
+				net = "unknown"
+			}
+			//上行最大延迟
+			maxdelayup, _ = stats.Max(delayfloatArr)
+
+			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
+			crAvgValue, _ := stats.Mean(CrfloatArr)
+			crStdValue, _ := stats.StandardDeviationPopulation(CrfloatArr)
+			frAvgValue, _ := stats.Mean(FrfloatArr)
+			frStdValue, _ := stats.StandardDeviationPopulation(FrfloatArr)
+			delayAvgValue, _ := stats.Mean(delayfloatArr)
+			delayStdValue, _ := stats.StandardDeviationPopulation(delayfloatArr)
+			lossAvgValue, _ := stats.Mean(lossfloatArr)
+			lossStdValue, _ := stats.StandardDeviationPopulation(lossfloatArr)
+
+			var lossorg float64
+			for _, v := range lossfloatArr {
+				if v != 0 {
+					lossorg++
+				}
+			}
+			//			fmt.Println("crAvgValue", crAvgValue, "|", v.Value.Crarr)
+			//			fmt.Println("frAvgValue", frAvgValue, "|", v.Value.Frarr)
+			//			fmt.Println("delayAvgValue", delayAvgValue, "|", v.Value.Delayarr)
+			//			fmt.Println("lossAvgValue", lossAvgValue, "|", v.Value.Lossorgarr, "|", lossfloatArr)
+			//			fmt.Println("lossorg", lossorg)
+			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(crAvgValue)))
+			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(crStdValue)))
+			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(frAvgValue)))
+			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(frStdValue)))
+			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(delayAvgValue)))
+			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(delayStdValue)))
+			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(v.Value.Delayloss)))
+			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(v.Value.Loss)))
+			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(lossorg)))
+			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(lossAvgValue)))
+			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(int64(lossStdValue)))
+			videomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(maxdelayup)
+			if v.Value.Dropline == true {
+				dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(1))
+
+			}
+		} else {
+			var dev, net string
+			Devicetypestr := strconv.Itoa(v.Value.Devicetype)
+			Networktypestr := strconv.Itoa(v.Value.Networktype)
+			if devmeet[Devicetypestr] != "" {
+				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
+			} else {
+				dev = "unknown"
+			}
+			if netmeet[Networktypestr] != "" {
+				net = netmeet[Networktypestr]
+			} else {
+				net = "unknown"
+			}
+			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
+			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			videomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
 			delete(uservideoqualityup, k)
 		}
 
@@ -263,7 +501,7 @@ func Observe() {
 	}
 	//视频下行
 	for k, v := range uservideoqualitydown {
-		fmt.Println("down视频输出", v.Id, v.Value.Meetingid)
+
 		if v.Value.Crarr != "" && v.Value.Frarr != "" && v.Value.Delayarr != "" {
 			var dev, net string
 			CrfloatArr := strArrToFloatArr(strings.Split(v.Value.Crarr, ","))
@@ -274,6 +512,11 @@ func Observe() {
 			Networktypestr := strconv.Itoa(v.Value.Networktype)
 			if devmeet[Devicetypestr] != "" {
 				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
+
 			} else {
 				dev = "unknown"
 			}
@@ -282,7 +525,7 @@ func Observe() {
 			} else {
 				net = "unknown"
 			}
-
+			maxdelaydown, _ = stats.Max(delayfloatArr)
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
 			crAvgValue, _ := stats.Mean(CrfloatArr)
 			crStdValue, _ := stats.StandardDeviationPopulation(CrfloatArr)
@@ -300,23 +543,25 @@ func Observe() {
 					lossorg++
 				}
 			}
-			fmt.Println("crAvgValue", crAvgValue)
-			fmt.Println("frAvgValue", frAvgValue)
-			fmt.Println("delayAvgValue", delayAvgValue)
-			fmt.Println("lossorg", lossorg)
-			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(crAvgValue)))
-			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(crStdValue)))
-			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(frAvgValue)))
-			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(frStdValue)))
-			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(delayAvgValue)))
-			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(delayStdValue)))
-			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(v.Value.Delayloss)))
-			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(v.Value.Loss)))
-			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(lossorg)))
-			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(lossAvgValue)))
-			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(int64(lossStdValue)))
+			//			fmt.Println("crAvgValue", crAvgValue, "|", v.Value.Crarr)
+			//			fmt.Println("frAvgValue", frAvgValue, "|", v.Value.Frarr)
+			//			fmt.Println("delayAvgValue", delayAvgValue, "|", v.Value.Delayarr)
+			//			fmt.Println("lossAvgValue", lossAvgValue, "|", v.Value.Lossorgarr, "|", lossfloatArr)
+			//			fmt.Println("lossorg", lossorg)
+			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(crAvgValue)))
+			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(crStdValue)))
+			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(frAvgValue)))
+			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(frStdValue)))
+			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(delayAvgValue)))
+			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(delayStdValue)))
+			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(v.Value.Delayloss)))
+			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(v.Value.Loss)))
+			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(lossorg)))
+			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(lossAvgValue)))
+			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(int64(lossStdValue)))
+			videomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(maxdelaydown))
 			if v.Value.Dropline == true {
-				dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(1))
+				dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(1))
 
 			}
 		} else {
@@ -325,6 +570,10 @@ func Observe() {
 			Networktypestr := strconv.Itoa(v.Value.Networktype)
 			if devmeet[Devicetypestr] != "" {
 				dev = devmeet[Devicetypestr]
+				devstreamkey := Devicetypestr + "|" + strconv.Itoa(v.Value.Resourceid)
+				if devstream[devstreamkey] != "" {
+					dev = devstream[devstreamkey]
+				}
 			} else {
 				dev = "unknown"
 			}
@@ -334,18 +583,19 @@ func Observe() {
 				net = "unknown"
 			}
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
-			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
-			dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down").Set(float64(0))
+			crAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			crStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			frAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			frStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			delayAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			delayStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			delayLoss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			loss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			lossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			lossOrgAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			videomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
 			delete(uservideoqualitydown, k)
 		}
 
@@ -365,7 +615,7 @@ func Observe() {
 		if v.Value.Meetingid == 0 {
 			continue
 		}
-		fmt.Println("up音频输出", v.Id, v.Value.Meetingid, "1,2,3,4,10", v.Value.Oneempty, v.Value.Twoempty, v.Value.Threeempty, v.Value.Fourempty, v.Value.Tenempty, "|", v.Value.Users)
+		//fmt.Println("up音频输出", v.Id, v.Value.Meetingid, "1,2,3,4,10", v.Value.Oneempty, v.Value.Twoempty, v.Value.Threeempty, v.Value.Fourempty, v.Value.Tenempty, "|", v.Value.Users)
 		if v.Value.Users != 0 {
 			var dev, net string
 			Devicetypestr := strconv.Itoa(v.Value.Devicetype)
@@ -383,11 +633,26 @@ func Observe() {
 
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
 
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "one").Set(float64(v.Value.Oneempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "two").Set(float64(v.Value.Twoempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "three").Set(float64(v.Value.Threeempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "foure").Set(float64(v.Value.Fourempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "ten").Set(float64(v.Value.Tenempty))
+			lossfloatArr := strArrToFloatArr(strings.Split(v.Value.Lossorgarr, ","))
+			lossAvgValue, _ := stats.Mean(lossfloatArr)
+			lossStdValue, _ := stats.StandardDeviationPopulation(lossfloatArr)
+
+			var lossorg float64
+			for _, v := range lossfloatArr {
+				if v != 0 {
+					lossorg++
+				}
+			}
+			audioloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(v.Value.Loss))
+			audiolossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(lossorg))
+			audiolossAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(lossAvgValue))
+			audiolossStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(lossStdValue))
+
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "one", v.Value.Usertype).Set(float64(v.Value.Oneempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "two", v.Value.Usertype).Set(float64(v.Value.Twoempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "three", v.Value.Usertype).Set(float64(v.Value.Threeempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "foure", v.Value.Usertype).Set(float64(v.Value.Fourempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "ten", v.Value.Usertype).Set(float64(v.Value.Tenempty))
 
 		} else {
 			var dev, net string
@@ -404,11 +669,17 @@ func Observe() {
 				net = "unknown"
 			}
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "one").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "two").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "three").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "foure").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "ten").Set(float64(0))
+
+			audioloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			audiolossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			audiolossAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+			audiolossStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype).Set(float64(0))
+
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "one", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "two", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "three", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "foure", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "ten", v.Value.Usertype).Set(float64(0))
 			delete(uservideoqualityaudioup, k)
 		}
 
@@ -427,7 +698,7 @@ func Observe() {
 		if v.Value.Meetingid == 0 {
 			continue
 		}
-		fmt.Println("down音频输出", v.Id, v.Value.Meetingid, "1,2,3,4,10", v.Value.Oneempty, v.Value.Twoempty, v.Value.Threeempty, v.Value.Fourempty, v.Value.Tenempty, "|", v.Value.Users)
+		//fmt.Println("down音频输出", v.Id, v.Value.Meetingid, "1,2,3,4,10", v.Value.Oneempty, v.Value.Twoempty, v.Value.Threeempty, v.Value.Fourempty, v.Value.Tenempty, "|", v.Value.Users)
 		if v.Value.Users != 0 {
 			var dev, net string
 
@@ -446,12 +717,26 @@ func Observe() {
 
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
 
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "one").Set(float64(v.Value.Oneempty))
-			fmt.Println("||||", v.Value.Oneempty)
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "two").Set(float64(v.Value.Twoempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "three").Set(float64(v.Value.Threeempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "foure").Set(float64(v.Value.Fourempty))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "ten").Set(float64(v.Value.Tenempty))
+			lossfloatArr := strArrToFloatArr(strings.Split(v.Value.Lossorgarr, ","))
+			lossAvgValue, _ := stats.Mean(lossfloatArr)
+			lossStdValue, _ := stats.StandardDeviationPopulation(lossfloatArr)
+
+			var lossorg float64
+			for _, v := range lossfloatArr {
+				if v != 0 {
+					lossorg++
+				}
+			}
+			audioloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(v.Value.Loss))
+			audiolossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(lossorg))
+			audiolossAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(lossAvgValue))
+			audiolossStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(lossStdValue))
+
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "one", v.Value.Usertype).Set(float64(v.Value.Oneempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "two", v.Value.Usertype).Set(float64(v.Value.Twoempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "three", v.Value.Usertype).Set(float64(v.Value.Threeempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "foure", v.Value.Usertype).Set(float64(v.Value.Fourempty))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "ten", v.Value.Usertype).Set(float64(v.Value.Tenempty))
 
 		} else {
 			var dev, net string
@@ -468,11 +753,17 @@ func Observe() {
 				net = "unknown"
 			}
 			meetidstr := strconv.FormatInt(int64(v.Value.Meetingid), 10)
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "one").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "two").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "three").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "foure").Set(float64(0))
-			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "ten").Set(float64(0))
+
+			audioloss.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			audiolossOrg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			audiolossAvg.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+			audiolossStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype).Set(float64(0))
+
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "one", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "two", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "three", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "foure", v.Value.Usertype).Set(float64(0))
+			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "ten", v.Value.Usertype).Set(float64(0))
 			delete(uservideoqualityaudiodown, k)
 		}
 
@@ -485,6 +776,31 @@ func Observe() {
 		user.Value.Fourempty = 0
 		user.Value.Tenempty = 0
 		uservideoqualityaudiodown[k] = user
+	}
+	for k, v := range meetqualified {
+		if v.Qualified == 0 {
+			kstr := strconv.Itoa(k)
+			meetqualifiedrate.WithLabelValues(kstr, v.Usertype).Set(0)
+			delete(meetqualified, k)
+			continue
+		}
+		kstr := strconv.Itoa(k)
+		meetqualifiedrate.WithLabelValues(kstr, v.Usertype).Set(v.Qualified)
+		meetqualified[k] = usermeet{
+			Qualified: 0,
+			Usertype:  v.Usertype,
+		}
+	}
+	for k, v := range meetc2cqualifiedmap {
+		if v == 0 {
+			meetingidstr := strconv.Itoa(int(k.Meetingid))
+			meetc2cqualified.WithLabelValues(k.Called, k.Caller, meetingidstr, k.Qualified, k.Cpu, k.Usertype).Set(0)
+			delete(meetc2cqualifiedmap, k)
+			continue
+		}
+		meetingidstr := strconv.Itoa(int(k.Meetingid))
+		meetc2cqualified.WithLabelValues(k.Called, k.Caller, meetingidstr, k.Qualified, k.Cpu, k.Usertype).Set(v)
+		meetc2cqualifiedmap[k] = 0
 	}
 	fmt.Println("puseOK")
 }
@@ -500,4 +816,15 @@ func syObserve(meetumber int) {
 	fmt.Println("商业会议数量", meetumber)
 	synode.WithLabelValues("meet").Set(float64(meetumber))
 
+}
+
+//字符串数组转换为float数组
+func strArrToFloatArr(strArr []string) []float64 {
+	i := len(strArr)
+	floatArr := make([]float64, i)
+	for i, v := range strArr {
+		f, _ := strconv.ParseFloat(v, 64)
+		floatArr[i] = f
+	}
+	return floatArr
 }

@@ -52,8 +52,11 @@ type RConfig struct {
 		Netmeet         map[string]string `yaml:"netmeet"`
 		CnlogS          string            `yaml:"cnlogS"`
 		Relaymap        map[string]string `yaml:"relaymap"`
+		Devstream       map[string]string `yaml:"devstream"`
 	}
 }
+
+var devstream map[string]string
 
 //mongodb 模型
 
@@ -97,8 +100,9 @@ type p2pispcity struct {
 }
 type uservideoinfo struct {
 	Id struct {
-		Userid    string
-		Speakerid string
+		Userid     string
+		Speakerid  string
+		Resourceid int
 	} "_id"
 	Value struct {
 		Userip      string
@@ -111,6 +115,7 @@ type uservideoinfo struct {
 		Meetingid   float64
 		Devicetype  int
 		Networktype int
+		Resourceid  int
 		Crarr       string
 		Frarr       string
 		Lossorgarr  string
@@ -124,6 +129,7 @@ type uservideoinfo struct {
 		Threeempty  int
 		Fourempty   int
 		Tenempty    int
+		Usertype    string
 	}
 }
 type relayflow struct {
@@ -242,17 +248,22 @@ var monOldusersmeet map[string]int
 
 //视频体验统计
 type userkey struct {
-	Userid    string
-	Meetintid string
-	Speakerid string
+	Userid     string
+	Meetintid  string
+	Speakerid  string
+	Resourceid int
 }
 
 var uservideoqualityup map[userkey]uservideoinfo
 var uservideoqualitydown map[userkey]uservideoinfo
 var uservideoqualityaudioup map[userkey]uservideoinfo
 var uservideoqualityaudiodown map[userkey]uservideoinfo
+var userfilequalityup map[userkey]uservideoinfo
+var userfilequalitydown map[userkey]uservideoinfo
 var devmeet map[string]string
 var netmeet map[string]string
+var maxdelayup float64
+var maxdelaydown float64
 
 type usertime struct {
 	userid    string
@@ -261,31 +272,59 @@ type usertime struct {
 	endtime   time.Time
 }
 
+//会议合格率
+var meetqualified map[int]usermeet
+
+var meetc2cqualifiedmap map[userc2c]float64
+
 //prometheus var
 var (
-	nodenow         *(prometheus.GaugeVec)
-	nodenowcalltime *(prometheus.GaugeVec)
-	nodecallip      *(prometheus.GaugeVec)
-	node            *(prometheus.GaugeVec)
-	synode          *(prometheus.GaugeVec)
-	entcalltimemeet *(prometheus.GaugeVec)
-	entipmeet       *(prometheus.GaugeVec)
-	meetrelay       *(prometheus.GaugeVec)
-	p2pactive       *(prometheus.GaugeVec)
-	meetactive      *(prometheus.GaugeVec)
-	crAvg           *(prometheus.GaugeVec)
-	crStd           *(prometheus.GaugeVec)
-	frAvg           *(prometheus.GaugeVec)
-	frStd           *(prometheus.GaugeVec)
-	delayAvg        *(prometheus.GaugeVec)
-	delayStd        *(prometheus.GaugeVec)
-	delayLoss       *(prometheus.GaugeVec)
-	dropline        *(prometheus.GaugeVec)
-	loss            *(prometheus.GaugeVec)
-	lossOrg         *(prometheus.GaugeVec)
-	lossOrgAvg      *(prometheus.GaugeVec)
-	lossOrgStd      *(prometheus.GaugeVec)
-	Emptyaudiobag   *(prometheus.GaugeVec)
+	nodenow           *(prometheus.GaugeVec)
+	nodenowcalltime   *(prometheus.GaugeVec)
+	nodecallip        *(prometheus.GaugeVec)
+	node              *(prometheus.GaugeVec)
+	synode            *(prometheus.GaugeVec)
+	entcalltimemeet   *(prometheus.GaugeVec)
+	entipmeet         *(prometheus.GaugeVec)
+	meetrelay         *(prometheus.GaugeVec)
+	p2pactive         *(prometheus.GaugeVec)
+	meetactive        *(prometheus.GaugeVec)
+	filecrAvg         *(prometheus.GaugeVec)
+	filecrStd         *(prometheus.GaugeVec)
+	filefrAvg         *(prometheus.GaugeVec)
+	filefrStd         *(prometheus.GaugeVec)
+	filedelayAvg      *(prometheus.GaugeVec)
+	filedelayStd      *(prometheus.GaugeVec)
+	filedelayLoss     *(prometheus.GaugeVec)
+	filedropline      *(prometheus.GaugeVec)
+	fileloss          *(prometheus.GaugeVec)
+	filelossOrg       *(prometheus.GaugeVec)
+	filelossOrgAvg    *(prometheus.GaugeVec)
+	filelossOrgStd    *(prometheus.GaugeVec)
+	crAvg             *(prometheus.GaugeVec)
+	crStd             *(prometheus.GaugeVec)
+	frAvg             *(prometheus.GaugeVec)
+	frStd             *(prometheus.GaugeVec)
+	delayAvg          *(prometheus.GaugeVec)
+	delayStd          *(prometheus.GaugeVec)
+	delayLoss         *(prometheus.GaugeVec)
+	dropline          *(prometheus.GaugeVec)
+	loss              *(prometheus.GaugeVec)
+	lossOrg           *(prometheus.GaugeVec)
+	lossOrgAvg        *(prometheus.GaugeVec)
+	lossOrgStd        *(prometheus.GaugeVec)
+	Emptyaudiobag     *(prometheus.GaugeVec)
+	audioloss         *(prometheus.GaugeVec)
+	audiolossAvg      *(prometheus.GaugeVec)
+	audiolossStd      *(prometheus.GaugeVec)
+	audiolossOrg      *(prometheus.GaugeVec)
+	videomaxdelay     *(prometheus.GaugeVec)
+	filevideomaxdelay *(prometheus.GaugeVec)
+
+	//会议合格率
+	meetqualifiedrate *(prometheus.GaugeVec)
+	//会议c2c合格率和cpu使用情况
+	meetc2cqualified *(prometheus.GaugeVec)
 	//解析excal后生成的map
 	usermap map[int64]string
 	//临时usermap
@@ -328,7 +367,11 @@ func getNumber(db *sql.DB) {
 	uservideoqualitydown = make(map[userkey]uservideoinfo)
 	uservideoqualityaudioup = make(map[userkey]uservideoinfo)
 	uservideoqualityaudiodown = make(map[userkey]uservideoinfo)
+	userfilequalityup = make(map[userkey]uservideoinfo)
+	userfilequalitydown = make(map[userkey]uservideoinfo)
 	temporaryUser = make(map[int]usertime)
+	meetqualified = make(map[int]usermeet)
+	meetc2cqualifiedmap = make(map[userc2c]float64)
 	dommap = globeCfg.Output.Dom
 	ispmap = globeCfg.Output.Isp
 	devp2pmap = globeCfg.Output.Devp2p
@@ -439,6 +482,7 @@ func loadConfig() {
 }
 func init() {
 	loadConfig() //加载配置文件
+	devstream = globeCfg.Output.Devstream
 	devmeet = globeCfg.Output.Devmeet
 	netmeet = globeCfg.Output.Netmeet
 	nodenow = prometheus.NewGaugeVec(prometheus.GaugeOpts{
@@ -534,7 +578,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filecrAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filecrAvg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	crStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -551,7 +614,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filecrStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filecrStd",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	frAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -568,7 +650,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filefrAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filefrAvg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	frStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -585,7 +686,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filefrStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filefrStd",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	delayAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -602,7 +722,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filedelayAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filedelayAvg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	delayStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -619,7 +758,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filedelayStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filedelayStd",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	delayLoss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -636,7 +794,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filedelayLoss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filedelayLoss",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	dropline = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -653,7 +830,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filedropline = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filedropline",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	loss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -670,7 +866,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	fileloss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "fileloss",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	lossOrg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -687,7 +902,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filelossOrg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filelossOrg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	lossOrgAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -704,7 +938,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filelossOrgAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filelossOrgAvg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	lossOrgStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -721,7 +974,26 @@ func init() {
 		"userDom",
 		"userIsp",
 		"relayDomIsp",
-		"updown"})
+		"updown",
+		"userType"})
+	filelossOrgStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filelossOrgStd",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
 	Emptyaudiobag = prometheus.NewGaugeVec(prometheus.GaugeOpts{
 		Namespace: "user",
 		Subsystem: "quality",
@@ -739,7 +1011,137 @@ func init() {
 		"userIsp",
 		"relayDomIsp",
 		"updown",
-		"emptygrades"})
+		"emptygrades",
+		"userType"})
+	audiolossOrg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "audiolossOrg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
+	audiolossAvg = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "audiolossAvg",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
+	audiolossStd = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "audiolossStd",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
+	audioloss = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "audioloss",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
+	meetqualifiedrate = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "meet",
+		Subsystem: "quality",
+		Name:      "qualified",
+		Help:      "state",
+	}, []string{
+		"meetingId",
+		"userType"})
+	meetc2cqualified = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "meet",
+		Subsystem: "quality",
+		Name:      "c2c",
+		Help:      "state",
+	}, []string{
+		"caller",
+		"called",
+		"meetingId",
+		"qualified",
+		"cpu",
+		"userType"})
+	videomaxdelay = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "videomaxdelay",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
+	filevideomaxdelay = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Namespace: "user",
+		Subsystem: "quality",
+		Name:      "filevideomaxdelay",
+		Help:      "state",
+	}, []string{
+		"userId",
+		"Speakerid",
+		"meetingId",
+		"deviceType",
+		"networkType",
+		"userEnt",
+		"meetEnt",
+		"userDom",
+		"userIsp",
+		"relayDomIsp",
+		"updown",
+		"userType"})
+
 	prometheus.MustRegister(node)
 	prometheus.MustRegister(synode)
 	prometheus.MustRegister(nodenow)
@@ -750,6 +1152,18 @@ func init() {
 	prometheus.MustRegister(meetrelay)
 	prometheus.MustRegister(p2pactive)
 	prometheus.MustRegister(meetactive)
+	prometheus.MustRegister(filecrAvg)
+	prometheus.MustRegister(filecrStd)
+	prometheus.MustRegister(filefrAvg)
+	prometheus.MustRegister(filefrStd)
+	prometheus.MustRegister(filedelayAvg)
+	prometheus.MustRegister(filedelayStd)
+	prometheus.MustRegister(filedelayLoss)
+	prometheus.MustRegister(filedropline)
+	prometheus.MustRegister(fileloss)
+	prometheus.MustRegister(filelossOrg)
+	prometheus.MustRegister(filelossOrgAvg)
+	prometheus.MustRegister(filelossOrgStd)
 	prometheus.MustRegister(crAvg)
 	prometheus.MustRegister(crStd)
 	prometheus.MustRegister(frAvg)
@@ -763,6 +1177,14 @@ func init() {
 	prometheus.MustRegister(lossOrgAvg)
 	prometheus.MustRegister(lossOrgStd)
 	prometheus.MustRegister(Emptyaudiobag)
+	prometheus.MustRegister(audiolossOrg)
+	prometheus.MustRegister(audiolossAvg)
+	prometheus.MustRegister(audiolossStd)
+	prometheus.MustRegister(audioloss)
+	prometheus.MustRegister(meetqualifiedrate)
+	prometheus.MustRegister(meetc2cqualified)
+	prometheus.MustRegister(videomaxdelay)
+	prometheus.MustRegister(filevideomaxdelay)
 
 }
 
@@ -855,15 +1277,4 @@ func main() {
 	//	signal.Notify(c, os.Interrupt, os.Kill)
 	s := <-c
 	fmt.Println("exitss", s)
-}
-
-//字符串数组转换为float数组
-func strArrToFloatArr(strArr []string) []float64 {
-	i := len(strArr)
-	floatArr := make([]float64, i)
-	for i, v := range strArr {
-		f, _ := strconv.ParseFloat(v, 64)
-		floatArr[i] = f
-	}
-	return floatArr
 }
