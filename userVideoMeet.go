@@ -30,7 +30,7 @@ func uservideoup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 			}else{
 				fin=this.lossRateFinal/100.0
 			}
-            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId} , 
+            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId,relayIp: this.relayIp} , 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -244,6 +244,7 @@ func uservideoup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 			Meetintid:  meetid,
 			Speakerid:  v.Id.Speakerid,
 			Resourceid: v.Value.Resourceid,
+			Relay:      relayDomIsp,
 		}
 
 		if uservideoqualityup[userkeys].Id.Userid == "" {
@@ -271,6 +272,7 @@ func uservideoup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 			uservideoqualityup[userkeys] = user
 		} else {
 			user := uservideoqualityup[userkeys]
+			user.Value.Relaydomisp = relayDomIsp
 			user.Value.Crarr += "," + v.Value.Crarr
 			user.Value.Frarr += "," + v.Value.Frarr
 			user.Value.Delayarr += "," + v.Value.Delayarr
@@ -308,7 +310,7 @@ func uservideodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 			}else{
 				fin=this.lossRateFinal/100.0
 			}
-            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId} , 
+            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId,relayIp: this.relayIp} , 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -523,6 +525,7 @@ func uservideodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 			Meetintid:  meetid,
 			Speakerid:  v.Id.Speakerid,
 			Resourceid: v.Value.Resourceid,
+			Relay:      relayDomIsp,
 		}
 
 		if uservideoqualitydown[userkeys].Id.Userid == "" {
@@ -550,6 +553,7 @@ func uservideodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 			uservideoqualitydown[userkeys] = user
 		} else {
 			user := uservideoqualitydown[userkeys]
+			user.Value.Relaydomisp = relayDomIsp
 			user.Value.Crarr += "," + v.Value.Crarr
 			user.Value.Frarr += "," + v.Value.Frarr
 			user.Value.Delayarr += "," + v.Value.Delayarr
@@ -587,7 +591,7 @@ func useraudioup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 			}else{
 				fin=this.lossRateFinal/100.0
 			}
-            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId} , 
+            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId,relayIp: this.relayIp} , 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -772,6 +776,7 @@ func useraudioup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 			Meetintid:  meetid,
 			Speakerid:  v.Id.Speakerid,
 			Resourceid: v.Value.Resourceid,
+			Relay:      relayDomIsp,
 		}
 		if uservideoqualityaudioup[userkeys].Id.Userid == "" {
 
@@ -797,6 +802,7 @@ func useraudioup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 			uservideoqualityaudioup[userkeys] = user
 		} else {
 			user := uservideoqualityaudioup[userkeys]
+			user.Value.Relaydomisp = relayDomIsp
 			user.Value.Loss += v.Value.Loss
 			user.Value.Lossorgarr += "," + v.Value.Lossorgarr
 			user.Value.Oneempty += v.Value.Oneempty
@@ -833,7 +839,7 @@ func useraudiodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 			}else{
 				fin=this.lossRateFinal/100
 			}
-            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId}, 
+            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId,relayIp: this.relayIp}, 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -1033,6 +1039,7 @@ func useraudiodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 			Meetintid:  meetid,
 			Speakerid:  v.Id.Speakerid,
 			Resourceid: v.Value.Resourceid,
+			Relay:      relayDomIsp,
 		}
 		if uservideoqualityaudiodown[userkeys].Id.Userid == "**" {
 			continue
@@ -1061,6 +1068,7 @@ func useraudiodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 			uservideoqualityaudiodown[userkeys] = user
 		} else {
 			user := uservideoqualityaudiodown[userkeys]
+			user.Value.Relaydomisp = relayDomIsp
 			user.Value.Loss += v.Value.Loss
 			user.Value.Lossorgarr += "," + v.Value.Lossorgarr
 			user.Value.Oneempty += v.Value.Oneempty
@@ -1096,7 +1104,7 @@ func userfileup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime in
 			}else{
 				fin=this.lossRateFinal/100.0
 			}
-            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId} , 
+            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId,relayIp: this.relayIp} , 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -1310,6 +1318,7 @@ func userfileup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime in
 			Meetintid:  meetid,
 			Speakerid:  v.Id.Speakerid,
 			Resourceid: v.Value.Resourceid,
+			Relay:      relayDomIsp,
 		}
 
 		if userfilequalityup[userkeys].Id.Userid == "" {
@@ -1337,6 +1346,7 @@ func userfileup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime in
 			userfilequalityup[userkeys] = user
 		} else {
 			user := userfilequalityup[userkeys]
+			user.Value.Relaydomisp = relayDomIsp
 			user.Value.Crarr += "," + v.Value.Crarr
 			user.Value.Frarr += "," + v.Value.Frarr
 			user.Value.Delayarr += "," + v.Value.Delayarr
@@ -1374,7 +1384,7 @@ func userfiledown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime 
 			}else{
 				fin=this.lossRateFinal/100.0
 			}
-            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId} , 
+            emit({userid:this.userId, speakerid:this.speakerId,resourceId:this.resourceId,relayIp: this.relayIp} , 
                   {userIp: this.userIp, 
                       relayIp: this.relayIp, 
                       meetingId: this.meetingId,
@@ -1589,6 +1599,7 @@ func userfiledown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime 
 			Meetintid:  meetid,
 			Speakerid:  v.Id.Speakerid,
 			Resourceid: v.Value.Resourceid,
+			Relay:      relayDomIsp,
 		}
 
 		if userfilequalitydown[userkeys].Id.Userid == "" {
@@ -1616,6 +1627,7 @@ func userfiledown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime 
 			userfilequalitydown[userkeys] = user
 		} else {
 			user := userfilequalitydown[userkeys]
+			user.Value.Relaydomisp = relayDomIsp
 			user.Value.Crarr += "," + v.Value.Crarr
 			user.Value.Frarr += "," + v.Value.Frarr
 			user.Value.Delayarr += "," + v.Value.Delayarr
