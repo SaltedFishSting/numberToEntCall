@@ -251,7 +251,6 @@ type userkey struct {
 	Userid     string
 	Meetintid  string
 	Speakerid  string
-	Relay      string
 	Resourceid int
 }
 
