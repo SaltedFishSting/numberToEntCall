@@ -44,7 +44,7 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 	mapfunc2 := ` function() { 
 	 if ((this.resourceId == 301 && this.deviceType == 5) || this.resourceId == 200){
        var bw = this.bandwidth;
-        if (bw < 0 || bw>100000){
+        if (bw < 0 || bw>200000){
             bw = 0;
         }
         var upbw = 0;
