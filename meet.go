@@ -43,7 +43,7 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 	//查询meet的relay上下行流量的mapreduce
 	mapfunc2 := ` function() { 
 	 if ((this.resourceId == 301 && this.deviceType == 5) || this.resourceId == 200){
-       var bw = this.bandwidth;
+       var bw = this.traffic;
         if (bw < 0 || bw>200000){
             bw = 0;
         }
@@ -347,6 +347,7 @@ func toPromtheus(ip string, db string, table1 string) {
 		fmt.Println(err, "222")
 		return
 	}
+	session.SetMode(mgo.Eventual, true)
 	defer session.Close()
 	collection := session.DB(db).C(table1)
 	var nowtime meetinfo
