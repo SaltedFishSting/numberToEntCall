@@ -24,13 +24,13 @@ func Observe() {
 	syuser["realuser"] = 0
 	syuser["alluser"] = 0
 	//当前企业通话数
-	fmt.Println("当前企业通话数", len(entToNumber1))
+	//fmt.Println("当前企业通话数", len(entToNumber1))
 	for k, v := range entToNumber1 {
 		nodenow.WithLabelValues(k, "Now").Set(float64(v))
 		entToNumber1[k] = 0
 	}
 	//新增企业通话数
-	fmt.Println("新增企业通话数", len(entToNumber2))
+	//fmt.Println("新增企业通话数", len(entToNumber2))
 	for k, v := range entToNumber2 {
 		nodenow.WithLabelValues(k, "New").Set(float64(v))
 		entToNumber2[k] = 0
@@ -42,19 +42,19 @@ func Observe() {
 		entToNumber3[k] = 0
 	}
 	//企业延迟插入的通话数（时间与实际时间相差5m及以上）
-	fmt.Println("企业延迟插入的通话数", len(entToNumber4))
+	//fmt.Println("企业延迟插入的通话数", len(entToNumber4))
 	for k, v := range entToNumber4 {
 		nodenow.WithLabelValues(k, "Glean").Set(float64(v))
 		entToNumber4[k] = 0
 	}
 	//企业通话总时长
-	fmt.Println("企业通话总时长", len(entToNumber5))
+	//fmt.Println("企业通话总时长", len(entToNumber5))
 	for k, v := range entToNumber5 {
 		nodenowcalltime.WithLabelValues(k, "CallTime").Set(float64(v))
 		entToNumber5[k] = 0
 	}
 	//按地域划分的通话数（p2p）
-	fmt.Println("按地域划分的通话数（p2p）", len(domToNumber))
+	//fmt.Println("按地域划分的通话数（p2p）", len(domToNumber))
 	for k, v := range domToNumber {
 		if dommap[k] == "" {
 			nodecallip.WithLabelValues("unknown", "dom").Set(float64(v))
@@ -64,7 +64,7 @@ func Observe() {
 		domToNumber[k] = 0
 	}
 	//按运营商划分的通话数（p2p）
-	fmt.Println("按运营商划分的通话数（p2p）", len(ispToNumber))
+	//fmt.Println("按运营商划分的通话数（p2p）", len(ispToNumber))
 	for k, v := range ispToNumber {
 		if ispmap[k] == "" {
 			nodecallip.WithLabelValues("unknown", "isp").Set(float64(v))
@@ -74,7 +74,7 @@ func Observe() {
 		ispToNumber[k] = 0
 	}
 	//按设备类型划分的通话数（p2p）
-	fmt.Println("按设备类型划分的通话数（p2p）", len(devToNumber))
+	//fmt.Println("按设备类型划分的通话数（p2p）", len(devToNumber))
 	for k, v := range devToNumber {
 		if devp2pmap[k] == "" {
 			nodecallip.WithLabelValues("unknown", "dev").Set(float64(v))
@@ -84,7 +84,7 @@ func Observe() {
 		devToNumber[k] = 0
 	}
 	//按网络类型划分的通话数（p2p）
-	fmt.Println("按网络类型划分的通话数（p2p）", len(netToNumber))
+	//fmt.Println("按网络类型划分的通话数（p2p）", len(netToNumber))
 	for k, v := range netToNumber {
 		if netp2pmap[k] == "" {
 			nodecallip.WithLabelValues("unknown", "net").Set(float64(v))
@@ -95,47 +95,47 @@ func Observe() {
 		netToNumber[k] = 0
 	}
 	//企业通话时长（meet）
-	fmt.Println("企业通话时长（meet）", len(entTocallTime))
+	//fmt.Println("企业通话时长（meet）", len(entTocallTime))
 	for k, v := range entTocallTime {
 		entcalltimemeet.WithLabelValues(k).Set(float64(v))
 		entTocallTime[k] = 0
 	}
 	//按地域划分的通话数（meet）
-	fmt.Println("按地域划分的通话数（meet）", len(domToNumbermeet))
+	//fmt.Println("按地域划分的通话数（meet）", len(domToNumbermeet))
 	for k, v := range domToNumbermeet {
 		entipmeet.WithLabelValues(k, "dom").Set(float64(v))
 		domToNumbermeet[k] = 0
 	}
 	//按运营商划分的通话数（meet）
-	fmt.Println("按运营商划分的通话数（meet）", len(ispToNumbermeet))
+	//fmt.Println("按运营商划分的通话数（meet）", len(ispToNumbermeet))
 	for k, v := range ispToNumbermeet {
 		entipmeet.WithLabelValues(k, "isp").Set(float64(v))
 		ispToNumbermeet[k] = 0
 	}
 	//按设备类型划分的通话数（meet）
-	fmt.Println("按设备类型划分的通话数（meet）", len(devToNumbermeet))
+	//fmt.Println("按设备类型划分的通话数（meet）", len(devToNumbermeet))
 	for k, v := range devToNumbermeet {
 		entipmeet.WithLabelValues(k, "dev").Set(float64(v))
 		devToNumbermeet[k] = 0
 	}
 	//按网络类型划分的通话数（meet）
-	fmt.Println("按网络类型划分的通话数（meet）", len(netToNumbermeet))
+	//fmt.Println("按网络类型划分的通话数（meet）", len(netToNumbermeet))
 	for k, v := range netToNumbermeet {
 		entipmeet.WithLabelValues(k, "net").Set(float64(v))
 		netToNumbermeet[k] = 0
 	}
-	fmt.Println("meetrelayup", len(meetrelayup))
+	//fmt.Println("meetrelayup", len(meetrelayup))
 	for k, v := range meetrelayup {
 		meetrelay.WithLabelValues(k, "up").Set(float64(v / 60))
 		meetrelayup[k] = 0
 	}
-	fmt.Println("meetrelaydown", len(meetrelaydown))
+	//fmt.Println("meetrelaydown", len(meetrelaydown))
 	for k, v := range meetrelaydown {
 		meetrelay.WithLabelValues(k, "down").Set(float64(v / 60))
 		meetrelaydown[k] = 0
 	}
 	//p2p用户活跃统计
-	fmt.Println("p2p用户活跃统计", len(newusersp2p))
+	//fmt.Println("p2p用户活跃统计", len(newusersp2p))
 	for k, v := range newusersp2p {
 		p2pactive.WithLabelValues(k, "new").Set(float64(v))
 		newusersp2p[k] = 0
@@ -154,7 +154,7 @@ func Observe() {
 		dayOldusersp2p[k] = 0
 	}
 	//meet用户活跃统计
-	fmt.Println("meet用户活跃统计", len(newusersmeet))
+	//fmt.Println("meet用户活跃统计", len(newusersmeet))
 	for k, v := range newusersmeet {
 		meetactive.WithLabelValues(k, "new").Set(float64(v))
 		newusersmeet[k] = 0
@@ -174,7 +174,12 @@ func Observe() {
 	}
 
 	//user <-> speaker 之间的码流统计
-	fmt.Println("user <-> speaker 之间的码流统计", len(userspeaktraffic))
+	//fmt.Println("user <-> speaker 之间的码流统计", len(userspeaktraffic))
+	var b int = 0
+	for _, v := range userspeaktraffic {
+		b += len(v.flow)
+	}
+	//fmt.Println("user <-> speaker 之间的码流统计flow", b)
 	for k, v := range userspeaktraffic {
 		if v.Relaydomisp == "" {
 			fmt.Println(v, "172")
@@ -214,6 +219,11 @@ func Observe() {
 			trStd.WithLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev).Set(0)
 			trMax.WithLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev).Set(0)
 			trMin.WithLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev).Set(0)
+
+			trAvg.DeleteLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev)
+			trStd.DeleteLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev)
+			trMax.DeleteLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev)
+			trMin.DeleteLabelValues(k.Userid, k.Speakerid, k.Meetintid, updown, v.UserDom, v.UserIsp, v.Relaydomisp, dev)
 			delete(userspeaktraffic, k)
 
 		}
@@ -221,7 +231,12 @@ func Observe() {
 	}
 
 	//relay间流量
-	fmt.Println("relay间流量", len(relaybetweens))
+	//fmt.Println("relay间流量", len(relaybetweens))
+	var a int = 0
+	for _, v := range relaybetweens {
+		a += len(v.flow)
+	}
+	//fmt.Println("relay间流量flow", a)
 	for k, v := range relaybetweens {
 
 		meetid := strconv.Itoa(int(k.Meetintid))
@@ -234,6 +249,9 @@ func Observe() {
 			relaybetweens[k] = v
 		} else {
 			relaytorelayflow.WithLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype).Set(0)
+
+			relaytorelayflow.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype)
+
 			if v.isnull == 1 {
 				delete(relaybetweens, k)
 				continue
@@ -245,7 +263,7 @@ func Observe() {
 	//relay间传输丢包
 
 	relaymap := globeCfg.Output.Relaymap
-	fmt.Println("relay间传输丢包", len(relaybetweenloss))
+	//fmt.Println("relay间传输丢包", len(relaybetweenloss))
 	for k, v := range relaybetweenloss {
 
 		meetid := strconv.Itoa(int(k.Meetintid))
@@ -326,6 +344,17 @@ func Observe() {
 			relaytorelayOrgMaxloss.WithLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp).Set(0)
 			relaytorelayOrgMinloss.WithLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp).Set(0)
 			relaytorelayOrgloss.WithLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp).Set(0)
+
+			relaytorelayFinAvgloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+			relaytorelayFinMaxloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+			relaytorelayFinMinloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+			relaytorelayFinloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+
+			relaytorelayOrgAvgloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+			relaytorelayOrgMaxloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+			relaytorelayOrgMinloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+			relaytorelayOrgloss.DeleteLabelValues(k.Relayid, k.Userip, k.Speakerid, meetid, k.Usertype, relayDomIsp)
+
 			delete(relaybetweenloss, k)
 			continue
 		}
@@ -334,7 +363,7 @@ func Observe() {
 	}
 
 	//文档上下行
-	fmt.Println("文档上下行", len(userfilequalityupdown))
+	//fmt.Println("文档上下行", len(userfilequalityupdown))
 	for k, v := range userfilequalityupdown {
 		var updown string
 		if v.Id.Speakerid == v.Id.Userid {
@@ -449,6 +478,25 @@ func Observe() {
 			filelossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype).Set(float64(0))
 			filedropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype).Set(float64(0))
 			filevideomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype).Set(float64(0))
+
+			filecrAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filecrStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filefrAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filefrStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filecrMax.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filecrMin.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filefrMax.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filefrMin.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filedelayAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filedelayStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filedelayLoss.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			fileloss.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filelossOrg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filelossOrgAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filelossOrgStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filedropline.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			filevideomaxdelay.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+
 			delete(userfilequalityupdown, k)
 			continue
 		}
@@ -466,7 +514,7 @@ func Observe() {
 	}
 
 	//视频上下行
-	fmt.Println("视频上下行", len(uservideoqualityupdown))
+	//fmt.Println("视频上下行", len(uservideoqualityupdown))
 	for k, v := range uservideoqualityupdown {
 		var updown string
 		if v.Id.Speakerid == v.Id.Userid {
@@ -582,6 +630,25 @@ func Observe() {
 			lossOrgStd.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype).Set(float64(0))
 			dropline.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype).Set(float64(0))
 			videomaxdelay.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype).Set(float64(0))
+
+			crAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			crStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			frAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			frStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			crMax.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			crMin.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			frMax.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			frMin.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			delayAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			delayStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			delayLoss.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			loss.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			lossOrg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			lossOrgAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			lossOrgStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			dropline.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+			videomaxdelay.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, updown, v.Value.Usertype)
+
 			delete(uservideoqualityupdown, k)
 			continue
 		}
@@ -599,7 +666,7 @@ func Observe() {
 	}
 
 	//音频上行
-	fmt.Println("音频上行", len(uservideoqualityaudioup))
+	//fmt.Println("音频上行", len(uservideoqualityaudioup))
 	for k, v := range uservideoqualityaudioup {
 		if v.Value.Meetingid == 0 {
 			continue
@@ -669,6 +736,18 @@ func Observe() {
 			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "three", v.Value.Usertype).Set(float64(0))
 			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "foure", v.Value.Usertype).Set(float64(0))
 			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "ten", v.Value.Usertype).Set(float64(0))
+
+			audioloss.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype)
+			audiolossOrg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype)
+			audiolossAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype)
+			audiolossStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", v.Value.Usertype)
+
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "one", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "two", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "three", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "foure", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "up", "ten", v.Value.Usertype)
+
 			delete(uservideoqualityaudioup, k)
 			continue
 		}
@@ -684,7 +763,7 @@ func Observe() {
 		uservideoqualityaudioup[k] = user
 	}
 	//音频下行
-	fmt.Println("音频下行", len(uservideoqualityaudiodown))
+	//fmt.Println("音频下行", len(uservideoqualityaudiodown))
 	for k, v := range uservideoqualityaudiodown {
 		if v.Value.Meetingid == 0 {
 			continue
@@ -755,6 +834,17 @@ func Observe() {
 			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "three", v.Value.Usertype).Set(float64(0))
 			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "foure", v.Value.Usertype).Set(float64(0))
 			Emptyaudiobag.WithLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "ten", v.Value.Usertype).Set(float64(0))
+
+			audioloss.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype)
+			audiolossOrg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype)
+			audiolossAvg.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype)
+			audiolossStd.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", v.Value.Usertype)
+
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "one", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "two", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "three", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "foure", v.Value.Usertype)
+			Emptyaudiobag.DeleteLabelValues(v.Id.Userid, v.Id.Speakerid, meetidstr, dev, net, v.Value.Userent, v.Value.Meetent, v.Value.Userdom, v.Value.Userisp, v.Value.Relaydomisp, "down", "ten", v.Value.Usertype)
 			delete(uservideoqualityaudiodown, k)
 			continue
 		}

@@ -176,12 +176,14 @@ func meetEntToTime(meetsession *mgo.Session, nowtime meetinfo, min10time int32) 
 				_, err := collection2.Find(bson.M{"timeStamp": bson.M{"$gte": min10time}}).MapReduce(mapreduce, &meet2MapReduces)
 				if err != nil {
 					fmt.Println(err, "135")
-					return
+					lnumber++
+					continue
 				}
 				_, err = collection2.Find(bson.M{"timeStamp": bson.M{"$gte": min10time}}).MapReduce(mapreduce2, &relayflows)
 				if err != nil {
 					fmt.Println(err, "140")
-					return
+					lnumber++
+					continue
 				}
 				for _, v := range relayflows {
 					var ID string

@@ -92,6 +92,7 @@ func userspeaktrafficupdown(conn *mgo.Collection, collectionmeet *mgo.Collection
 	var userspeaktrafficinfos []userspeaktrafficinfo
 
 	_, err := conn.Find(bson.M{"timeStamp": bson.M{"$gte": mintime}}).MapReduce(mapreduceup, &userspeaktrafficinfos)
+
 	if err != nil {
 		fmt.Println(err, "99")
 		if len(userspeaktrafficinfos) == 0 {

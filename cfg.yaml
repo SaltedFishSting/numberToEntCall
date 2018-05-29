@@ -9,7 +9,7 @@ output:
   pushGateway:           true
   pushGatewayAddr:       "localhost:9091"
   monitorID:             "M6"
-  period:                300 ##秒
+  period:                60 ##秒
   ip:                    "114.112.74.30:60013"
   db:                    "dataAnalysis_new"
   table1:                "report_summary_tab"

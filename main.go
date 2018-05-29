@@ -7,11 +7,14 @@ import (
 	"gproto"
 	"io/ioutil"
 	"net/http"
-	"os"
-	"os/signal"
+	_ "net/http/pprof"
+	"runtime"
+	//	"os"
+	//	"os/signal"
 	"strconv"
 	"time"
 
+	"github.com/DeanThompson/ginpprof"
 	"github.com/axgle/mahonia"
 	"github.com/gin-gonic/gin"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
@@ -30,6 +33,7 @@ type RConfig struct {
 		Addr           string `yaml:"addr"`
 		HttpListenPort int    `yaml:"httpListenPort"`
 	}
+
 	Output struct {
 		Prometheus      bool              `yaml:"prometheus"`
 		PushGateway     bool              `yaml:"pushGateway"`
@@ -646,6 +650,7 @@ func loadConfig() {
 }
 func init() {
 	loadConfig() //加载配置文件
+	loadexcel()  //加载商业用户表
 	devstream = globeCfg.Output.Devstream
 	devmeet = globeCfg.Output.Devmeet
 	netmeet = globeCfg.Output.Netmeet
@@ -1744,17 +1749,17 @@ func main() {
 		fmt.Println("Program startup ok...")
 		//从mysql中获取企业号段初始化
 		getNumber(db)
-
 		fmt.Println("dbOK")
 		for {
 
 			//加载用户excel文件
-			loadexcel()
+			//loadexcel()
 			//从mongodb中获取数据
 			toPromtheus(mip, mdb, mtable1)
 			getCall(collection)
 			ispCityCall(collection2)
 			Observe()
+
 			//是否推送数据给PushGatway
 			if globeCfg.Output.PushGateway {
 				var info = make(map[string]string)
@@ -1764,6 +1769,7 @@ func main() {
 				}
 			}
 			fmt.Println("****** ", time.Now(), " ******")
+			runtime.GC()
 			fmt.Println()
 			fmt.Println()
 			time.Sleep(time.Duration(globeCfg.Output.Period) * time.Second)
@@ -1779,17 +1785,18 @@ func main() {
 		}()
 	}
 	//开启aduser接口端口10088
-	go func() {
-		router := gin.Default()
-		router.GET("adduser", adduser)
-		router.GET("showuser", showuser)
-		router.GET("deleteuser", deleteuser)
-		router.GET("updateuser", updateuser)
-		router.Run(":10088")
-	}()
-	c := make(chan os.Signal, 1)
-	signal.Notify(c)
-	//	signal.Notify(c, os.Interrupt, os.Kill)
-	s := <-c
-	fmt.Println("exitss", s)
+	//	go func() {
+	router := gin.Default()
+	router.GET("adduser", adduser)
+	router.GET("showuser", showuser)
+	router.GET("deleteuser", deleteuser)
+	router.GET("updateuser", updateuser)
+	ginpprof.Wrapper(router)
+	router.Run(":10088")
+	//	}()
+	//	c := make(chan os.Signal, 1)
+	//	signal.Notify(c)
+	//	//	signal.Notify(c, os.Interrupt, os.Kill)
+	//	s := <-c
+	//	fmt.Println("exitss", s)
 }
