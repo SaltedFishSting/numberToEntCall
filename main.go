@@ -650,7 +650,7 @@ func loadConfig() {
 }
 func init() {
 	loadConfig() //加载配置文件
-	loadexcel()  //加载商业用户表
+	//	loadexcel()  //加载商业用户表
 	devstream = globeCfg.Output.Devstream
 	devmeet = globeCfg.Output.Devmeet
 	netmeet = globeCfg.Output.Netmeet
@@ -1753,7 +1753,7 @@ func main() {
 		for {
 
 			//加载用户excel文件
-			//loadexcel()
+			loadexcel()
 			//从mongodb中获取数据
 			toPromtheus(mip, mdb, mtable1)
 			getCall(collection)

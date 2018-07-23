@@ -372,7 +372,7 @@ func uservideoupdown(conn *mgo.Collection, collectionmeet *mgo.Collection, minti
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 		userid := strings.Split(v.Value.Userip, ":")
 		loc, err := ip17mon.Find(userid[0])
@@ -615,7 +615,7 @@ func useraudioup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 		userid := strings.Split(v.Value.Userip, ":")
 		loc, err := ip17mon.Find(userid[0])
@@ -641,7 +641,7 @@ func useraudioup(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime i
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 
 		userkeys := userkey{
@@ -876,7 +876,7 @@ func useraudiodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 		userid := strings.Split(v.Value.Userip, ":")
 		loc, err := ip17mon.Find(userid[0])
@@ -902,7 +902,7 @@ func useraudiodown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintime
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 
 		userkeys := userkey{
@@ -1158,7 +1158,7 @@ func userfileupdown(conn *mgo.Collection, collectionmeet *mgo.Collection, mintim
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 		userid := strings.Split(v.Value.Userip, ":")
 		loc, err := ip17mon.Find(userid[0])
@@ -1408,7 +1408,7 @@ func relaybetweenflow(conn *mgo.Collection, collectionmeet *mgo.Collection, mint
 		if relaymap[relayid[0]] != "" {
 			relayDomIsp = relaymap[relayid[0]]
 		} else {
-			relayDomIsp = "unknown"
+			relayDomIsp = relayid[0]
 		}
 		for _, v1 := range v.Value.LossStat {
 			var UserDomIsp string
